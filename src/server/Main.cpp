@@ -949,431 +949,532 @@ main(int argc, char *argv[])
 }
 
 #else
+
 static int xmp_getattr(const char *path, struct stat *stbuf)
 {
-    int res;
+	int res;
 
-    res = lstat(path, stbuf);
-    if (res == -1)
-        return -errno;
+	res = lstat(path, stbuf);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_fgetattr(const char *path, struct stat *stbuf,
-                        struct fuse_file_info *fi)
+			struct fuse_file_info *fi)
 {
-    int res;
+	int res;
 
-    (void) path;
+	(void) path;
 
-    res = fstat(fi->fh, stbuf);
-    if (res == -1)
-        return -errno;
+	res = fstat(fi->fh, stbuf);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_access(const char *path, int mask)
 {
-    int res;
+	int res;
 
-    res = access(path, mask);
-    if (res == -1)
-        return -errno;
+	res = access(path, mask);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_readlink(const char *path, char *buf, size_t size)
 {
-    int res;
+	int res;
 
-    res = readlink(path, buf, size - 1);
-    if (res == -1)
-        return -errno;
+	res = readlink(path, buf, size - 1);
+	if (res == -1)
+		return -errno;
 
-    buf[res] = '\0';
-    return 0;
+	buf[res] = '\0';
+	return 0;
 }
+
+struct xmp_dirp {
+	DIR *dp;
+	struct dirent *entry;
+	off_t offset;
+};
 
 static int xmp_opendir(const char *path, struct fuse_file_info *fi)
 {
-    DIR *dp = opendir(path);
-    if (dp == NULL)
-        return -errno;
+	int res;
+	struct xmp_dirp *d = (struct xmp_dirp *)malloc(sizeof(struct xmp_dirp));
+	if (d == NULL)
+		return -ENOMEM;
 
-    fi->fh = (unsigned long) dp;
-    return 0;
+	d->dp = opendir(path);
+	if (d->dp == NULL) {
+		res = -errno;
+		free(d);
+		return res;
+	}
+	d->offset = 0;
+	d->entry = NULL;
+
+	fi->fh = (unsigned long) d;
+	return 0;
 }
 
-static inline DIR *get_dirp(struct fuse_file_info *fi)
+static inline struct xmp_dirp *get_dirp(struct fuse_file_info *fi)
 {
-    return (DIR *) (uintptr_t) fi->fh;
+	return (struct xmp_dirp *) (uintptr_t) fi->fh;
 }
 
 static int xmp_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
-                       off_t offset, struct fuse_file_info *fi)
+		       off_t offset, struct fuse_file_info *fi)
 {
-    DIR *dp = get_dirp(fi);
-    struct dirent *de;
+	struct xmp_dirp *d = get_dirp(fi);
 
-    (void) path;
-    seekdir(dp, offset);
-    while ((de = readdir(dp)) != NULL) {
-        struct stat st;
-        memset(&st, 0, sizeof(st));
-        st.st_ino = de->d_ino;
-        st.st_mode = de->d_type << 12;
-        if (filler(buf, de->d_name, &st, telldir(dp)))
-            break;
-    }
+	(void) path;
+	if (offset != d->offset) {
+		seekdir(d->dp, offset);
+		d->entry = NULL;
+		d->offset = offset;
+	}
+	while (1) {
+		struct stat st;
+		off_t nextoff;
 
-    return 0;
+		if (!d->entry) {
+			d->entry = readdir(d->dp);
+			if (!d->entry)
+				break;
+		}
+
+		memset(&st, 0, sizeof(st));
+		st.st_ino = d->entry->d_ino;
+		st.st_mode = d->entry->d_type << 12;
+		nextoff = telldir(d->dp);
+		if (filler(buf, d->entry->d_name, &st, nextoff))
+			break;
+
+		d->entry = NULL;
+		d->offset = nextoff;
+	}
+
+	return 0;
 }
 
 static int xmp_releasedir(const char *path, struct fuse_file_info *fi)
 {
-    DIR *dp = get_dirp(fi);
-    (void) path;
-    closedir(dp);
-    return 0;
+	struct xmp_dirp *d = get_dirp(fi);
+	(void) path;
+	closedir(d->dp);
+	free(d);
+	return 0;
 }
 
 static int xmp_mknod(const char *path, mode_t mode, dev_t rdev)
 {
-    int res;
+	int res;
 
-    if (S_ISFIFO(mode))
-        res = mkfifo(path, mode);
-    else
-        res = mknod(path, mode, rdev);
-    if (res == -1)
-        return -errno;
+	if (S_ISFIFO(mode))
+		res = mkfifo(path, mode);
+	else
+		res = mknod(path, mode, rdev);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_mkdir(const char *path, mode_t mode)
 {
-    int res;
+	int res;
 
-    res = mkdir(path, mode);
-    if (res == -1)
-        return -errno;
+	res = mkdir(path, mode);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_unlink(const char *path)
 {
-    int res;
+	int res;
 
-    res = unlink(path);
-    if (res == -1)
-        return -errno;
+	res = unlink(path);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_rmdir(const char *path)
 {
-    int res;
+	int res;
 
-    res = rmdir(path);
-    if (res == -1)
-        return -errno;
+	res = rmdir(path);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_symlink(const char *from, const char *to)
 {
-    int res;
+	int res;
 
-    res = symlink(from, to);
-    if (res == -1)
-        return -errno;
+	res = symlink(from, to);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_rename(const char *from, const char *to)
 {
-    int res;
+	int res;
 
-    res = rename(from, to);
-    if (res == -1)
-        return -errno;
+	res = rename(from, to);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_link(const char *from, const char *to)
 {
-    int res;
+	int res;
 
-    res = link(from, to);
-    if (res == -1)
-        return -errno;
+	res = link(from, to);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_chmod(const char *path, mode_t mode)
 {
-    int res;
+	int res;
 
-    res = chmod(path, mode);
-    if (res == -1)
-        return -errno;
+	res = chmod(path, mode);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_chown(const char *path, uid_t uid, gid_t gid)
 {
-    int res;
+	int res;
 
-    res = lchown(path, uid, gid);
-    if (res == -1)
-        return -errno;
+	res = lchown(path, uid, gid);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_truncate(const char *path, off_t size)
 {
-    int res;
+	int res;
 
-    res = truncate(path, size);
-    if (res == -1)
-        return -errno;
+	res = truncate(path, size);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_ftruncate(const char *path, off_t size,
-                         struct fuse_file_info *fi)
+			 struct fuse_file_info *fi)
 {
-    int res;
+	int res;
 
-    (void) path;
+	(void) path;
 
-    res = ftruncate(fi->fh, size);
-    if (res == -1)
-        return -errno;
+	res = ftruncate(fi->fh, size);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
+#ifdef HAVE_UTIMENSAT
 static int xmp_utimens(const char *path, const struct timespec ts[2])
 {
-    int res;
-    struct timeval tv[2];
+	int res;
 
-    tv[0].tv_sec = ts[0].tv_sec;
-    tv[0].tv_usec = ts[0].tv_nsec / 1000;
-    tv[1].tv_sec = ts[1].tv_sec;
-    tv[1].tv_usec = ts[1].tv_nsec / 1000;
+	/* don't use utime/utimes since they follow symlinks */
+	res = utimensat(0, path, ts, AT_SYMLINK_NOFOLLOW);
+	if (res == -1)
+		return -errno;
 
-    res = utimes(path, tv);
-    if (res == -1)
-        return -errno;
-
-    return 0;
+	return 0;
 }
+#endif
 
 static int xmp_create(const char *path, mode_t mode, struct fuse_file_info *fi)
 {
-    int fd;
+	int fd;
 
-    fd = open(path, fi->flags, mode);
-    if (fd == -1)
-        return -errno;
+	fd = open(path, fi->flags, mode);
+	if (fd == -1)
+		return -errno;
 
-    fi->fh = fd;
-    return 0;
+	fi->fh = fd;
+	return 0;
 }
 
 static int xmp_open(const char *path, struct fuse_file_info *fi)
 {
-    int fd;
+	int fd;
 
-    fd = open(path, fi->flags);
-    if (fd == -1)
-        return -errno;
+	fd = open(path, fi->flags);
+	if (fd == -1)
+		return -errno;
 
-    fi->fh = fd;
-    return 0;
+	fi->fh = fd;
+	return 0;
 }
 
 static int xmp_read(const char *path, char *buf, size_t size, off_t offset,
-                    struct fuse_file_info *fi)
+		    struct fuse_file_info *fi)
 {
-    int res;
+	int res;
 
-    (void) path;
-    res = pread(fi->fh, buf, size, offset);
-    if (res == -1)
-        res = -errno;
+	(void) path;
+	res = pread(fi->fh, buf, size, offset);
+	if (res == -1)
+		res = -errno;
 
-    return res;
+	return res;
+}
+
+static int xmp_read_buf(const char *path, struct fuse_bufvec **bufp,
+			size_t size, off_t offset, struct fuse_file_info *fi)
+{
+	struct fuse_bufvec *src;
+
+	(void) path;
+
+	src = (struct fuse_bufvec *)malloc(sizeof(struct fuse_bufvec));
+	if (src == NULL)
+		return -ENOMEM;
+
+	*src = FUSE_BUFVEC_INIT(size);
+
+	src->buf[0].flags = (fuse_buf_flags)(FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK);
+	src->buf[0].fd = fi->fh;
+	src->buf[0].pos = offset;
+
+	*bufp = src;
+
+	return 0;
 }
 
 static int xmp_write(const char *path, const char *buf, size_t size,
-                     off_t offset, struct fuse_file_info *fi)
+		     off_t offset, struct fuse_file_info *fi)
 {
-    int res;
+	int res;
 
-    (void) path;
-    res = pwrite(fi->fh, buf, size, offset);
-    if (res == -1)
-        res = -errno;
+	(void) path;
+	res = pwrite(fi->fh, buf, size, offset);
+	if (res == -1)
+		res = -errno;
 
-    return res;
+	return res;
+}
+
+static int xmp_write_buf(const char *path, struct fuse_bufvec *buf,
+		     off_t offset, struct fuse_file_info *fi)
+{
+	struct fuse_bufvec dst = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
+
+	(void) path;
+
+	dst.buf[0].flags = (fuse_buf_flags)(FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK);
+	dst.buf[0].fd = fi->fh;
+	dst.buf[0].pos = offset;
+
+	return fuse_buf_copy(&dst, buf, FUSE_BUF_SPLICE_NONBLOCK);
 }
 
 static int xmp_statfs(const char *path, struct statvfs *stbuf)
 {
-    int res;
+	int res;
 
-    res = statvfs(path, stbuf);
-    if (res == -1)
-        return -errno;
+	res = statvfs(path, stbuf);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_flush(const char *path, struct fuse_file_info *fi)
 {
-    int res;
+	int res;
 
-    (void) path;
-    /* This is called from every close on an open file, so call the
-       close on the underlying filesystem.  But since flush may be
-       called multiple times for an open file, this must not really
-       close the file.  This is important if used on a network
-       filesystem like NFS which flush the data/metadata on close() */
-    res = close(dup(fi->fh));
-    if (res == -1)
-        return -errno;
+	(void) path;
+	/* This is called from every close on an open file, so call the
+	   close on the underlying filesystem.	But since flush may be
+	   called multiple times for an open file, this must not really
+	   close the file.  This is important if used on a network
+	   filesystem like NFS which flush the data/metadata on close() */
+	res = close(dup(fi->fh));
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
 static int xmp_release(const char *path, struct fuse_file_info *fi)
 {
-    (void) path;
-    close(fi->fh);
+	(void) path;
+	close(fi->fh);
 
-    return 0;
+	return 0;
 }
 
 static int xmp_fsync(const char *path, int isdatasync,
-                     struct fuse_file_info *fi)
+		     struct fuse_file_info *fi)
 {
-    int res;
-    (void) path;
+	int res;
+	(void) path;
 
 #ifndef HAVE_FDATASYNC
-    (void) isdatasync;
+	(void) isdatasync;
 #else
-    if (isdatasync)
-        res = fdatasync(fi->fh);
-    else
+	if (isdatasync)
+		res = fdatasync(fi->fh);
+	else
 #endif
-        res = fsync(fi->fh);
-    if (res == -1)
-        return -errno;
+		res = fsync(fi->fh);
+	if (res == -1)
+		return -errno;
 
-    return 0;
+	return 0;
 }
 
-#ifdef HAVE_SETXATTR
-/* xattr operations are optional and can safely be left unimplemented */
-static int xmp_setxattr(const char *path, const char *name, const char *value,
-                        size_t size, int flags)
+#ifdef HAVE_POSIX_FALLOCATE
+static int xmp_fallocate(const char *path, int mode,
+			off_t offset, off_t length, struct fuse_file_info *fi)
 {
-    int res = lsetxattr(path, name, value, size, flags);
-    if (res == -1)
-        return -errno;
-    return 0;
+	(void) path;
+
+	if (mode)
+		return -EOPNOTSUPP;
+
+	return -posix_fallocate(fi->fh, offset, length);
+}
+#endif
+
+static int xmp_setxattr(const char *path, const char *name, const char *value,
+			size_t size, int flags)
+{
+	int res = lsetxattr(path, name, value, size, flags);
+	if (res == -1)
+		return -errno;
+	return 0;
 }
 
 static int xmp_getxattr(const char *path, const char *name, char *value,
-                    size_t size)
+			size_t size)
 {
-    int res = lgetxattr(path, name, value, size);
-    if (res == -1)
-        return -errno;
-    return res;
+	int res = lgetxattr(path, name, value, size);
+	if (res == -1)
+		return -errno;
+	return res;
 }
 
 static int xmp_listxattr(const char *path, char *list, size_t size)
 {
-    int res = llistxattr(path, list, size);
-    if (res == -1)
-        return -errno;
-    return res;
+	int res = llistxattr(path, list, size);
+	if (res == -1)
+		return -errno;
+	return res;
 }
 
 static int xmp_removexattr(const char *path, const char *name)
 {
-    int res = lremovexattr(path, name);
-    if (res == -1)
-        return -errno;
-    return 0;
+	int res = lremovexattr(path, name);
+	if (res == -1)
+		return -errno;
+	return 0;
 }
-#endif /* HAVE_SETXATTR */
 
 static int xmp_lock(const char *path, struct fuse_file_info *fi, int cmd,
-                    struct flock *lock)
+		    struct flock *lock)
 {
-    return ulockmgr_op(fi->fh, cmd, lock, &fi->lock_owner,
-                       (size_t)sizeof(fi->lock_owner));
+	(void) path;
+
+	return ulockmgr_op(fi->fh, cmd, lock, &fi->lock_owner,
+			   sizeof(fi->lock_owner));
+}
+
+static int xmp_flock(const char *path, struct fuse_file_info *fi, int op)
+{
+	int res;
+	(void) path;
+
+	res = flock(fi->fh, op);
+	if (res == -1)
+		return -errno;
+
+	return 0;
 }
 
 int main(int argc, char *argv[])
 {
-    umask(0);
+	umask(0);
     fuse_operations xmp_oper;
-    xmp_oper.getattr	= xmp_getattr;
-    xmp_oper.fgetattr	= xmp_fgetattr;
-    xmp_oper.access	= xmp_access;
-    xmp_oper.readlink	= xmp_readlink;
-    xmp_oper.opendir	= xmp_opendir;
-    xmp_oper.readdir	= xmp_readdir;
-    xmp_oper.releasedir	= xmp_releasedir;
-    xmp_oper.mknod	= xmp_mknod;
-    xmp_oper.mkdir	= xmp_mkdir;
-    xmp_oper.symlink	= xmp_symlink;
-    xmp_oper.unlink	= xmp_unlink;
-    xmp_oper.rmdir	= xmp_rmdir;
-    xmp_oper.rename	= xmp_rename;
-    xmp_oper.link	= xmp_link;
-    xmp_oper.chmod	= xmp_chmod;
-    xmp_oper.chown	= xmp_chown;
-    xmp_oper.truncate	= xmp_truncate;
-    xmp_oper.ftruncate	= xmp_ftruncate;
-    xmp_oper.utimens	= xmp_utimens;
-    xmp_oper.create	= xmp_create;
-    xmp_oper.open	= xmp_open;
-    xmp_oper.read	= xmp_read;
-    xmp_oper.write	= xmp_write;
-    xmp_oper.statfs	= xmp_statfs;
-    xmp_oper.flush	= xmp_flush;
-    xmp_oper.release	= xmp_release;
-    xmp_oper.fsync	= xmp_fsync;
-#ifdef HAVE_SETXATTR
-    xmp_oper.setxattr	= xmp_setxattr;
-    xmp_oper.getxattr	= xmp_getxattr;
-    xmp_oper.listxattr	= xmp_listxattr;
-    xmp_oper.removexattr= xmp_removexattr;
+    memset(&xmp_oper, 0, sizeof(fuse_operations));
+	xmp_oper.getattr	= xmp_getattr;
+	xmp_oper.fgetattr	= xmp_fgetattr;
+	xmp_oper.access		= xmp_access;
+	xmp_oper.readlink	= xmp_readlink;
+	xmp_oper.opendir	= xmp_opendir;
+	xmp_oper.readdir	= xmp_readdir;
+	xmp_oper.releasedir	= xmp_releasedir;
+	xmp_oper.mknod		= xmp_mknod;
+	xmp_oper.mkdir		= xmp_mkdir;
+	xmp_oper.symlink	= xmp_symlink;
+	xmp_oper.unlink		= xmp_unlink;
+	xmp_oper.rmdir		= xmp_rmdir;
+	xmp_oper.rename		= xmp_rename;
+	xmp_oper.link		= xmp_link;
+	xmp_oper.chmod		= xmp_chmod;
+	xmp_oper.chown		= xmp_chown;
+	xmp_oper.truncate	= xmp_truncate;
+	xmp_oper.ftruncate	= xmp_ftruncate;
+#ifdef HAVE_UTIMENSAT
+	xmp_oper.utimens	= xmp_utimens;
 #endif
-    xmp_oper.lock	= xmp_lock;
+	xmp_oper.create		= xmp_create;
+	xmp_oper.open		= xmp_open;
+	xmp_oper.read		= xmp_read;
+	xmp_oper.read_buf	= xmp_read_buf;
+	xmp_oper.write		= xmp_write;
+	xmp_oper.write_buf	= xmp_write_buf;
+	xmp_oper.statfs		= xmp_statfs;
+	xmp_oper.flush		= xmp_flush;
+	xmp_oper.release	= xmp_release;
+	xmp_oper.fsync		= xmp_fsync;
+#ifdef HAVE_POSIX_FALLOCATE
+	xmp_oper.fallocate	= xmp_fallocate;
+#endif
+	xmp_oper.setxattr	= xmp_setxattr;
+	xmp_oper.getxattr	= xmp_getxattr;
+	xmp_oper.listxattr	= xmp_listxattr;
+	xmp_oper.removexattr	= xmp_removexattr;
+	xmp_oper.lock		= xmp_lock;
+	xmp_oper.flock		= xmp_flock;
 
-    return fuse_main(argc, argv, &xmp_oper, NULL);
+	xmp_oper.flag_nullpath_ok = 1;
+#if HAVE_UTIMENSAT
+	xmp_oper.flag_utime_omit_ok = 1;
+#endif
+	return fuse_main(argc, argv, &xmp_oper, NULL);
 }
 
 #endif
