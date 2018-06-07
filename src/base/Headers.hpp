@@ -5,13 +5,7 @@
 #define _WITH_GETLINE
 #endif
 
-#ifdef HAVE_SETXATTR
 #include <sys/xattr.h>
-#endif
-
-#ifdef HAVE_LIBULOCKMGR
-#include <ulockmgr.h>
-#endif
 
 #if __APPLE__
 #include <sys/ucred.h>
@@ -25,6 +19,10 @@
 
 #if __NetBSD__
 #include <util.h>
+#endif
+
+#ifndef __APPLE__
+#include <ulockmgr.h>
 #endif
 
 #include <arpa/inet.h>
