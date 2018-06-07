@@ -10,6 +10,8 @@
 #if __APPLE__
 #include <sys/ucred.h>
 #include <util.h>
+#include <sys/attr.h>
+#include <sys/vnode.h>
 #elif __FreeBSD__
 #include <libutil.h>
 #elif __NetBSD__  // do not need pty.h on NetBSD
@@ -22,7 +24,9 @@
 #endif
 
 #ifndef __APPLE__
+extern "C" {
 #include <ulockmgr.h>
+}
 #endif
 
 #include <arpa/inet.h>
@@ -36,7 +40,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/attr.h>
 #include <sys/file.h>
 #include <sys/ioctl.h>
 #include <sys/param.h>
@@ -45,7 +48,6 @@
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
-#include <sys/vnode.h>
 #include <sys/xattr.h>
 #include <termios.h>
 #include <time.h>

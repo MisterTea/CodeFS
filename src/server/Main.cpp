@@ -1330,52 +1330,49 @@ static int xmp_removexattr(const char *path, const char *name)
 static int xmp_lock(const char *path, struct fuse_file_info *fi, int cmd,
                     struct flock *lock)
 {
-    (void) path;
-
     return ulockmgr_op(fi->fh, cmd, lock, &fi->lock_owner,
-                       sizeof(fi->lock_owner));
+                       (size_t)sizeof(fi->lock_owner));
 }
-
-static struct fuse_operations xmp_oper = {
-    .getattr	= xmp_getattr,
-    .fgetattr	= xmp_fgetattr,
-    .access	= xmp_access,
-    .readlink	= xmp_readlink,
-    .opendir	= xmp_opendir,
-    .readdir	= xmp_readdir,
-    .releasedir	= xmp_releasedir,
-    .mknod	= xmp_mknod,
-    .mkdir	= xmp_mkdir,
-    .symlink	= xmp_symlink,
-    .unlink	= xmp_unlink,
-    .rmdir	= xmp_rmdir,
-    .rename	= xmp_rename,
-    .link	= xmp_link,
-    .chmod	= xmp_chmod,
-    .chown	= xmp_chown,
-    .truncate	= xmp_truncate,
-    .ftruncate	= xmp_ftruncate,
-    .utimens	= xmp_utimens,
-    .create	= xmp_create,
-    .open	= xmp_open,
-    .read	= xmp_read,
-    .write	= xmp_write,
-    .statfs	= xmp_statfs,
-    .flush	= xmp_flush,
-    .release	= xmp_release,
-    .fsync	= xmp_fsync,
-#ifdef HAVE_SETXATTR
-    .setxattr	= xmp_setxattr,
-    .getxattr	= xmp_getxattr,
-    .listxattr	= xmp_listxattr,
-    .removexattr= xmp_removexattr,
-#endif
-    .lock	= xmp_lock,
-};
 
 int main(int argc, char *argv[])
 {
     umask(0);
+    fuse_operations xmp_oper;
+    xmp_oper.getattr	= xmp_getattr;
+    xmp_oper.fgetattr	= xmp_fgetattr;
+    xmp_oper.access	= xmp_access;
+    xmp_oper.readlink	= xmp_readlink;
+    xmp_oper.opendir	= xmp_opendir;
+    xmp_oper.readdir	= xmp_readdir;
+    xmp_oper.releasedir	= xmp_releasedir;
+    xmp_oper.mknod	= xmp_mknod;
+    xmp_oper.mkdir	= xmp_mkdir;
+    xmp_oper.symlink	= xmp_symlink;
+    xmp_oper.unlink	= xmp_unlink;
+    xmp_oper.rmdir	= xmp_rmdir;
+    xmp_oper.rename	= xmp_rename;
+    xmp_oper.link	= xmp_link;
+    xmp_oper.chmod	= xmp_chmod;
+    xmp_oper.chown	= xmp_chown;
+    xmp_oper.truncate	= xmp_truncate;
+    xmp_oper.ftruncate	= xmp_ftruncate;
+    xmp_oper.utimens	= xmp_utimens;
+    xmp_oper.create	= xmp_create;
+    xmp_oper.open	= xmp_open;
+    xmp_oper.read	= xmp_read;
+    xmp_oper.write	= xmp_write;
+    xmp_oper.statfs	= xmp_statfs;
+    xmp_oper.flush	= xmp_flush;
+    xmp_oper.release	= xmp_release;
+    xmp_oper.fsync	= xmp_fsync;
+#ifdef HAVE_SETXATTR
+    xmp_oper.setxattr	= xmp_setxattr;
+    xmp_oper.getxattr	= xmp_getxattr;
+    xmp_oper.listxattr	= xmp_listxattr;
+    xmp_oper.removexattr= xmp_removexattr;
+#endif
+    xmp_oper.lock	= xmp_lock;
+
     return fuse_main(argc, argv, &xmp_oper, NULL);
 }
 

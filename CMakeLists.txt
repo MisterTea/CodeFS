@@ -48,6 +48,10 @@ IF(FREEBSD)
 ELSE()
   set(CORE_LIBRARIES util resolv)
 ENDIF()
+IF(APPLE)
+ELSE(APPLE)
+  SET(CORE_LIBRARIES ulockmgr ${CORE_LIBRARIES})
+ENDIF(APPLE)
 
 include_directories(
   src/base
