@@ -1,18 +1,6 @@
-/*
-  FUSE: Filesystem in Userspace
-  Copyright (C) 2001-2007  Miklos Szeredi <miklos@szeredi.hu>
+#include "Headers.hpp"
 
-  This program can be distributed under the terms of the GNU GPL.
-  See the file COPYING.
-
-*/
-
-/*
- * Loopback OSXFUSE file system in C. Uses the high-level FUSE API.
- * Based on the fusexmp_fh.c example from the Linux FUSE distribution.
- * Amit Singh <http://osxbook.com>
- */
-
+#ifdef __APPLE__
 #include <AvailabilityMacros.h>
 
 #if MAC_OS_X_VERSION_MIN_REQUIRED < 1050
@@ -24,25 +12,7 @@
 #else
 #define HAVE_FSETATTR_X 1
 #endif
-
-#define FUSE_USE_VERSION 26
-
-#define _GNU_SOURCE
-
-#include <fuse.h>
-#include <stdio.h>
-#include <stddef.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include <dirent.h>
-#include <errno.h>
-#include <sys/time.h>
-#include <sys/xattr.h>
-#include <sys/attr.h>
-#include <sys/param.h>
-#include <sys/vnode.h>
+#endif
 
 #if defined(_POSIX_C_SOURCE)
 typedef unsigned char  u_char;

@@ -31,19 +31,24 @@
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <pthread.h> /* POSIX Threads */
+#include <pthread.h>
 #include <pwd.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/file.h> /* flock(2) */
+#include <sys/attr.h>
+#include <sys/file.h>
 #include <sys/ioctl.h>
+#include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/un.h>
+#include <sys/vnode.h>
+#include <sys/xattr.h>
 #include <termios.h>
 #include <time.h>
 #include <unistd.h>
@@ -64,8 +69,7 @@
 #include <unordered_set>
 #include <vector>
 
-#define _GNU_SOURCE
-#define FUSE_USE_VERSION 31
+#define FUSE_USE_VERSION 26
 #include "fuse.h"
 
 #include <gflags/gflags.h>
