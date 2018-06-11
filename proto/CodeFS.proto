@@ -1,0 +1,40 @@
+syntax = "proto2";
+package codefs;
+
+message StatVfsData {
+  optional int64 bsize = 1;    /* Filesystem block size */
+  optional int64 frsize = 2;   /* Fragment size */
+  optional int64 blocks = 3;   /* Size of fs in f_frsize units */
+  optional int64 bfree = 4;    /* Number of free blocks */
+  optional int64 bavail = 5;   /* Number of free blocks for
+                            unprivileged users */
+  optional int64 files = 6;    /* Number of inodes */
+  optional int64 ffree = 7;    /* Number of free inodes */
+  optional int64 favail = 8;   /* Number of free inodes for
+unprivileged users */
+  optional int64 fsid = 9;     /* Filesystem ID */
+  optional int64 flag = 10;    /* Mount flags */
+  optional int64 namemax = 11; /* Maximum filename length */
+}
+
+message StatData {
+  optional int64 dev = 1;     /* ID of device containing file */
+  optional int64 ino = 2;     /* inode number */
+  optional int64 mode = 3;    /* protection */
+  optional int64 nlink = 4;   /* number of hard links */
+  optional int64 uid = 5;     /* user ID of owner */
+  optional int64 gid = 6;     /* group ID of owner */
+  optional int64 rdev = 7;    /* device ID (if special file) */
+  optional int64 size = 8;    /* total size, in bytes */
+  optional int64 blksize = 9; /* blocksize for file system I/O */
+  optional int64 blocks = 10; /* number of 512B blocks allocated */
+  optional int64 atime = 11;  /* time of last access */
+  optional int64 mtime = 12;  /* time of last modification */
+  optional int64 ctime = 13;  /* time of last status change */
+};
+
+message FileData {
+  optional int64 access = 1;
+  optional StatData stat = 2;
+  optional bytes symlink_contents = 3;
+}

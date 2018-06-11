@@ -80,6 +80,8 @@ extern "C" {
 #include "json.hpp"
 #include "sole.hpp"
 
+#include "CodeFS.pb.h"
+
 using namespace std;
 
 namespace google {}

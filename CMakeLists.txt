@@ -42,6 +42,7 @@ find_package(Threads REQUIRED)
 find_package(GFlags REQUIRED)
 find_package(LibFUSE REQUIRED)
 find_package(ZeroMQ REQUIRED)
+find_package(Protobuf REQUIRED)
 
 IF(FREEBSD)
   set(CORE_LIBRARIES util)
@@ -52,6 +53,19 @@ IF(APPLE)
 ELSE(APPLE)
   SET(CORE_LIBRARIES ulockmgr ${CORE_LIBRARIES})
 ENDIF(APPLE)
+
+PROTOBUF_GENERATE_CPP(
+  CODEFS_SRCS
+  CODEFS_HDRS
+
+  proto/CodeFS.proto
+)
+add_custom_target(
+  generated-code
+  DEPENDS
+
+  ${CODEFS_SRCS} ${CODEFS_HDRS}
+)
 
 include_directories(
   src/base
@@ -68,7 +82,11 @@ add_library(
   src/base/easylogging++.cc
   src/base/LogHandler.cpp
   src/base/DaemonCreator.cpp
-  )
+)
+add_dependencies(
+  codefs-lib
+  generated-code
+)
 
 add_executable (
   codefs

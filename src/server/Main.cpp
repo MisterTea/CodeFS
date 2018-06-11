@@ -1,5 +1,20 @@
 #include "Headers.hpp"
 
+class FdInfo {
+ public:
+  string path;
+
+  FdInfo(const string &_path) : path(_path) {}
+};
+
+struct loopback_dirp {
+  DIR *dp;
+  struct dirent *entry;
+  off_t offset;
+};
+
+unordered_map<int64_t, FdInfo> fdMap;
+
 static int loopback_getattr(const char *path, struct stat *stbuf) {
   int res;
 
@@ -11,14 +26,12 @@ static int loopback_getattr(const char *path, struct stat *stbuf) {
 
 static int loopback_fgetattr(const char *path, struct stat *stbuf,
                              struct fuse_file_info *fi) {
-  int res;
-
-  (void)path;
-
-  res = fstat(fi->fh, stbuf);
-  if (res == -1) return -errno;
-
-  return 0;
+  auto it = fdMap.find(fi->fh);
+  if (it == fdMap.end()) {
+    errno = EBADF;
+    return -errno;
+  }
+  return loopback_getattr(it->second.path.c_str(), stbuf);
 }
 
 static int loopback_access(const char *path, int mask) {
@@ -40,12 +53,6 @@ static int loopback_readlink(const char *path, char *buf, size_t size) {
   return 0;
 }
 
-struct loopback_dirp {
-  DIR *dp;
-  struct dirent *entry;
-  off_t offset;
-};
-
 static int loopback_opendir(const char *path, struct fuse_file_info *fi) {
   int res;
   struct loopback_dirp *d =
@@ -62,6 +69,7 @@ static int loopback_opendir(const char *path, struct fuse_file_info *fi) {
   d->entry = NULL;
 
   fi->fh = (unsigned long)d;
+  fdMap.insert(make_pair((unsigned long)d, FdInfo(string(path))));
   return 0;
 }
 
@@ -106,6 +114,11 @@ static int loopback_releasedir(const char *path, struct fuse_file_info *fi) {
   (void)path;
   closedir(d->dp);
   free(d);
+  auto it = fdMap.find(((unsigned long)d));
+  if (it == fdMap.end()) {
+    LOG(FATAL) << "Tried to close a dir that doesn't exist";
+  }
+  fdMap.erase(it);
   return 0;
 }
 
@@ -167,6 +180,7 @@ static int loopback_rename(const char *from, const char *to) {
 }
 
 static int loopback_link(const char *from, const char *to) {
+  LOG(FATAL) << "Not implemented";
   int res;
 
   res = link(from, to);
@@ -232,6 +246,7 @@ static int loopback_open(const char *path, struct fuse_file_info *fi) {
   if (fd == -1) return -errno;
 
   fi->fh = fd;
+  fdMap.insert(make_pair((int64_t)fd,FdInfo(string(path))));
   return 0;
 }
 
@@ -318,6 +333,11 @@ static int loopback_flush(const char *path, struct fuse_file_info *fi) {
 static int loopback_release(const char *path, struct fuse_file_info *fi) {
   (void)path;
   close(fi->fh);
+  auto it = fdMap.find(fi->fh);
+  if (it == fdMap.end()) {
+    LOG(FATAL) << "Tried to close an fd that doesn't exist";
+  }
+  fdMap.erase(it);
 
   return 0;
 }
@@ -788,7 +808,8 @@ void *loopback_init(struct fuse_conn_info *conn) {
   return NULL;
 }
 
-void loopback_destroy(void *userdata) { /* nothing */ }
+void loopback_destroy(void *userdata) { /* nothing */
+}
 
 #else
 
