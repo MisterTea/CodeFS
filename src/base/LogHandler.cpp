@@ -2,7 +2,7 @@
 
 INITIALIZE_EASYLOGGINGPP
 
-namespace et {
+namespace codefs {
 el::Configurations LogHandler::SetupLogHandler(int *argc, char ***argv) {
   // easylogging parse verbose arguments, see [Application Arguments]
   // in https://github.com/muflihun/easyloggingpp/blob/master/README.md
@@ -40,4 +40,4 @@ void LogHandler::rolloutHandler(const char *filename, std::size_t size) {
   ss << "rm " << filename;
   system(ss.str().c_str());
 }
-}  // namespace et
+}  // namespace codefs

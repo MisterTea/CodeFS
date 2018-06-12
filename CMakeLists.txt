@@ -84,6 +84,10 @@ add_library(
   src/base/easylogging++.cc
   src/base/LogHandler.cpp
   src/base/DaemonCreator.cpp
+  src/base/SocketHandler.cpp
+  src/base/UnixSocketHandler.cpp
+  src/base/RawSocketUtils.cpp
+  ${CODEFS_SRCS}
 )
 add_dependencies(
   codefs-lib
@@ -101,6 +105,7 @@ target_link_libraries (
   LINK_PUBLIC
   codefs-lib
   ${CMAKE_THREAD_LIBS_INIT}
+  ${PROTOBUF_LIBRARIES}
   ${GFLAGS_LIBRARIES}
   ${LIBFUSE_LIBRARIES}
   ${Boost_LIBRARIES}
@@ -111,6 +116,8 @@ add_executable (
   codefsserver
 
   src/server/Main.cpp
+  src/server/Scanner.cpp
+  src/server/Server.cpp
   )
 
 target_link_libraries (
@@ -118,6 +125,7 @@ target_link_libraries (
   LINK_PUBLIC
   codefs-lib
   ${CMAKE_THREAD_LIBS_INIT}
+  ${PROTOBUF_LIBRARIES}
   ${GFLAGS_LIBRARIES}
   ${LIBFUSE_LIBRARIES}
   ${Boost_LIBRARIES}

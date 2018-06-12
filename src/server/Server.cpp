@@ -1,0 +1,80 @@
+#include "Server.hpp"
+
+#include "RawSocketUtils.hpp"
+
+DEFINE_int32(port, 0, "Port to listen on");
+
+namespace codefs {
+Server::Server(shared_ptr<SocketHandler> _socketHandler, int _port,
+               shared_ptr<FileSystem> _fileSystem)
+    : socketHandler(_socketHandler),
+      port(_port),
+      clientFd(-1),
+      fileSystem(_fileSystem) {
+  socketHandler->listen(port);
+}
+
+void Server::update() {
+  timeval tv;
+  fd_set rfds;
+  int numCoreFds = 0;
+  int maxCoreFd = 0;
+  FD_ZERO(&rfds);
+  set<int> serverPortFds = socketHandler->getPortFds(FLAGS_port);
+  for (int i : serverPortFds) {
+    FD_SET(i, &rfds);
+    maxCoreFd = max(maxCoreFd, i);
+    numCoreFds++;
+  }
+  if (clientFd >= 0) {
+    maxCoreFd = max(maxCoreFd, clientFd);
+    numCoreFds++;
+  }
+
+  tv.tv_sec = 0;
+  tv.tv_usec = 10000;
+  int numFdsSet = select(maxCoreFd + 1, &rfds, NULL, NULL, &tv);
+  FATAL_FAIL(numFdsSet);
+  if (numFdsSet == 0) {
+    return;
+  }
+
+  if (FD_ISSET(clientFd, &rfds)) {
+    // Got a message from a client
+    unsigned char header;
+    RawSocketUtils::readAll(clientFd, (char*)&header, 1);
+    switch (header) {
+      case CLIENT_SERVER_HEARTBEAT: {
+        RawSocketUtils::writeAll(clientFd, (const char*)&header, 1);
+      } break;
+      case CLIENT_SERVER_UPDATE_FILE: {
+        FilePathAndContents fpc =
+            RawSocketUtils::readProto<FilePathAndContents>(clientFd);
+        fileSystem->write(fpc.path(), fpc.contents());
+        RawSocketUtils::writeAll(clientFd, (const char*)&header, 1);
+      } break;
+      case CLIENT_SERVER_REQUEST_FILE: {
+        string path = RawSocketUtils::readMessage(clientFd);
+        FilePathAndContents fpc;
+        fpc.set_path(path);
+        fpc.set_contents(fileSystem->read(path));
+        RawSocketUtils::writeAll(clientFd, (const char*)&header, 1);
+        RawSocketUtils::writeProto(clientFd, fpc);
+      } break;
+    }
+  }
+
+  // We have something to do!
+  for (int i : serverPortFds) {
+    if (FD_ISSET(i, &rfds)) {
+      int newClientFd = socketHandler->accept(i);
+      // Kill the old client if it exists
+      if (clientFd >= 0) {
+        socketHandler->close(clientFd);
+      }
+      clientFd = newClientFd;
+      // TODO: Send the initial state
+    }
+  }
+}
+}  // namespace codefs

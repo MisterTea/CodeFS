@@ -1,6 +1,12 @@
 syntax = "proto2";
 package codefs;
 
+enum MessageHeaders {
+  CLIENT_SERVER_HEARTBEAT = 1;
+  CLIENT_SERVER_UPDATE_FILE = 2;
+  CLIENT_SERVER_REQUEST_FILE = 3;
+}
+
 message StatVfsData {
   optional int64 bsize = 1;    /* Filesystem block size */
   optional int64 frsize = 2;   /* Fragment size */
@@ -35,6 +41,11 @@ message StatData {
 
 message FileData {
   optional int64 access = 1;
-  optional StatData stat = 2;
+  optional StatData stat_data = 2;
   optional bytes symlink_contents = 3;
+}
+
+message FilePathAndContents {
+  optional string path = 1;
+  optional bytes contents = 2;
 }

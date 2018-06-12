@@ -1,8 +1,9 @@
 #include "Scanner.hpp"
 
+namespace codefs {
 unordered_map<string, FileData> Scanner::scanRecursively(const string& path) {}
 
-static FileData Scanner::scanFile(const string& path) {
+FileData Scanner::scanFile(const string& path) {
   FileData fd;
   fd.set_access(access(path.c_str(), R_OK | W_OK | X_OK));
   struct stat fileStat;
@@ -21,23 +22,24 @@ static FileData Scanner::scanFile(const string& path) {
   fStat.set_atime(fileStat.st_atime);
   fStat.set_mtime(fileStat.st_mtime);
   fStat.set_ctime(fileStat.st_ctime);
-  fd.set_stat(fStat);
+  *(fd.mutable_stat_data()) = fStat;
   if (S_ISLNK(fileStat.st_mode)) {
-    int bufsiz = sb.st_size + 1;
+    int bufsiz = fileStat.st_size + 1;
 
     /* Some magic symlinks under (for example) /proc and /sys
        report 'st_size' as zero. In that case, take PATH_MAX as
        a "good enough" estimate. */
 
-    if (sb.st_size == 0) {
+    if (fileStat.st_size == 0) {
       bufsiz = PATH_MAX;
     }
 
     string s(bufsiz, '\0');
-    nbytes = readlink(path.c_str(), &s[0], bufsiz);
+    int nbytes = readlink(path.c_str(), &s[0], bufsiz);
     FATAL_FAIL(nbytes);
-    s = s.substr(0, nbytes+1);
+    s = s.substr(0, nbytes + 1);
     fd.set_symlink_contents(s);
   }
   return fd;
 }
+}  // namespace codefs

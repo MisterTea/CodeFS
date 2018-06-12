@@ -1,9 +1,9 @@
-#ifndef __ETERNAL_TCP_LOG_HANDLER__
-#define __ETERNAL_TCP_LOG_HANDLER__
+#ifndef __CODEFS_LOG_HANDLER__
+#define __CODEFS_LOG_HANDLER__
 
 #include "Headers.hpp"
 
-namespace et {
+namespace codefs {
 class LogHandler {
  public:
   static el::Configurations SetupLogHandler(int *argc, char ***argv);
@@ -11,5 +11,5 @@ class LogHandler {
                            string maxlogsize = "20971520");
   static void rolloutHandler(const char *filename, std::size_t size);
 };
-}  // namespace et
-#endif  // __ETERNAL_TCP_LOG_HANDLER__
+}  // namespace codefs
+#endif  // __CODEFS_LOG_HANDLER__
