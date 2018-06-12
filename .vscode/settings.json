@@ -27,6 +27,8 @@
         "slist": "cpp",
         "hashtable": "cpp",
         "memory": "cpp",
-        "istream": "cpp"
+        "istream": "cpp",
+        "iosfwd": "cpp",
+        "ostream": "cpp"
     }
 }

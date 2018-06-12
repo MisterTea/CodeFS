@@ -6,9 +6,12 @@
 namespace codefs {
 class ClientFileSystem : public FileSystem {
  public:
+  explicit ClientFileSystem(const string &_absoluteFuseRoot)
+      : FileSystem(_absoluteFuseRoot) {}
   virtual ~ClientFileSystem() {}
   virtual void write(const string &path, const string &data) {}
   virtual string read(const string &path) {}
+  virtual void startFuse() {}
 };
 }  // namespace codefs
 

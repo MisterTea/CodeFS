@@ -6,9 +6,38 @@
 namespace codefs {
 class FileSystem {
  public:
-  virtual ~FileSystem() {}
+  class FsCallbackHandler {
+    virtual void fileChanged(const string &fusePath,
+                             const string &absolutePath) = 0;
+  };
+
+  explicit FileSystem(const string &_absoluteFuseRoot)
+      : absoluteFuseRoot(_absoluteFuseRoot) {
+        boost::trim_right_if(absoluteFuseRoot, boost::is_any_of("/"));
+      }
+  void setCallback(FileSystem::FsCallbackHandler *_callback) {
+    callback = _callback;
+  }
   virtual void write(const string &path, const string &data) = 0;
   virtual string read(const string &path) = 0;
+  virtual void startFuse() = 0;
+
+  virtual string absoluteToFuse(const string &absolutePath) {
+    if (absolutePath.find(absoluteFuseRoot) != 0) {
+      LOG(FATAL) << "Tried to convert absolute path to fuse that wasn't inside "
+                    "the fuse FS: "
+                 << absolutePath << " " << absoluteFuseRoot;
+    }
+    return absolutePath.substr(absoluteFuseRoot.size());
+  }
+  virtual string fuseToAbsolute(const string &fusePath) {
+    return absoluteFuseRoot + fusePath;
+  }
+
+ protected:
+  FileSystem::FsCallbackHandler *callback;
+  string absoluteFuseRoot;
+  shared_ptr<thread> fuseThread;
 };
 }  // namespace codefs
 

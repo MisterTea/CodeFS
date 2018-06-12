@@ -40,25 +40,25 @@ int Server::update() {
   if (FD_ISSET(clientFd, &rfds)) {
     // Got a message from a client
     unsigned char header;
-    RawSocketUtils::readAll(clientFd, (char*)&header, 1);
+    RawSocketUtils::readAll(clientFd, (char *)&header, 1);
     // TODO: update heartbeat watchdog
     switch (header) {
       // Requests
       case CLIENT_SERVER_HEARTBEAT: {
-        RawSocketUtils::writeAll(clientFd, (const char*)&header, 1);
+        RawSocketUtils::writeAll(clientFd, (const char *)&header, 1);
       } break;
       case CLIENT_SERVER_UPDATE_FILE: {
         FilePathAndContents fpc =
             RawSocketUtils::readProto<FilePathAndContents>(clientFd);
         fileSystem->write(fpc.path(), fpc.contents());
-        RawSocketUtils::writeAll(clientFd, (const char*)&header, 1);
+        RawSocketUtils::writeAll(clientFd, (const char *)&header, 1);
       } break;
       case CLIENT_SERVER_REQUEST_FILE: {
         string path = RawSocketUtils::readMessage(clientFd);
         FilePathAndContents fpc;
         fpc.set_path(path);
         fpc.set_contents(fileSystem->read(path));
-        RawSocketUtils::writeAll(clientFd, (const char*)&header, 1);
+        RawSocketUtils::writeAll(clientFd, (const char *)&header, 1);
         RawSocketUtils::writeProto(clientFd, fpc);
       } break;
 
@@ -85,4 +85,6 @@ int Server::update() {
 
   return 0;
 }
+
+void Server::fileChanged(const string &fusePath, const string &absolutePath) {}
 }  // namespace codefs

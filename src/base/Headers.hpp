@@ -82,6 +82,8 @@ extern "C" {
 
 #include "CodeFS.pb.h"
 
+#include <boost/algorithm/string.hpp>
+
 using namespace std;
 
 namespace google {}

@@ -1,7 +1,8 @@
 #include "Headers.hpp"
 
-#include "FileSystem.hpp"
+#include "ServerFileSystem.hpp"
 
+namespace codefs {
 class FdInfo {
  public:
   string path;
@@ -282,27 +283,6 @@ static int loopback_read(const char *path, char *buf, size_t size, off_t offset,
   return res;
 }
 
-static int loopback_read_buf(const char *path, struct fuse_bufvec **bufp,
-                             size_t size, off_t offset,
-                             struct fuse_file_info *fi) {
-  struct fuse_bufvec *src;
-
-  (void)path;
-
-  src = (struct fuse_bufvec *)malloc(sizeof(struct fuse_bufvec));
-  if (src == NULL) return -ENOMEM;
-
-  *src = FUSE_BUFVEC_INIT(size);
-
-  src->buf[0].flags = (fuse_buf_flags)(FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK);
-  src->buf[0].fd = fi->fh;
-  src->buf[0].pos = offset;
-
-  *bufp = src;
-
-  return 0;
-}
-
 static int loopback_write(const char *path, const char *buf, size_t size,
                           off_t offset, struct fuse_file_info *fi) {
   int res;
@@ -312,19 +292,6 @@ static int loopback_write(const char *path, const char *buf, size_t size,
   if (res == -1) res = -errno;
 
   return res;
-}
-
-static int loopback_write_buf(const char *path, struct fuse_bufvec *buf,
-                              off_t offset, struct fuse_file_info *fi) {
-  struct fuse_bufvec dst = FUSE_BUFVEC_INIT(fuse_buf_size(buf));
-
-  (void)path;
-
-  dst.buf[0].flags = (fuse_buf_flags)(FUSE_BUF_IS_FD | FUSE_BUF_FD_SEEK);
-  dst.buf[0].fd = fi->fh;
-  dst.buf[0].pos = offset;
-
-  return fuse_buf_copy(&dst, buf, FUSE_BUF_SPLICE_NONBLOCK);
 }
 
 static int loopback_statfs(const char *path, struct statvfs *stbuf) {
@@ -377,16 +344,6 @@ static int loopback_fsync(const char *path, int isdatasync,
 #endif
   } else
     res = fsync(fi->fh);
-  if (res == -1) return -errno;
-
-  return 0;
-}
-
-static int loopback_flock(const char *path, struct fuse_file_info *fi, int op) {
-  int res;
-  (void)path;
-
-  res = flock(fi->fh, op);
   if (res == -1) return -errno;
 
   return 0;
@@ -768,14 +725,6 @@ static int loopback_setxattr(const char *path, const char *name,
   return 0;
 }
 
-static int loopback_lock(const char *path, struct fuse_file_info *fi, int cmd,
-                         struct flock *lock) {
-  (void)path;
-
-  return ulockmgr_op(fi->fh, cmd, lock, &fi->lock_owner,
-                     sizeof(fi->lock_owner));
-}
-
 #endif
 
 static const struct fuse_opt loopback_opts[] = {
@@ -815,9 +764,7 @@ int main_unused(int argc, char *argv[]) {
   loopback_oper.create = loopback_create;
   loopback_oper.open = loopback_open;
   loopback_oper.read = loopback_read;
-  loopback_oper.read_buf = loopback_read_buf;
   loopback_oper.write = loopback_write;
-  loopback_oper.write_buf = loopback_write_buf;
   loopback_oper.statfs = loopback_statfs;
   loopback_oper.flush = loopback_flush;
   loopback_oper.release = loopback_release;
@@ -827,23 +774,18 @@ int main_unused(int argc, char *argv[]) {
   loopback_oper.listxattr = loopback_listxattr;
   loopback_oper.removexattr = loopback_removexattr;
 #ifdef __APPLE__
-  loopback_oper.exchange = loopback_exchange;
-  loopback_oper.getxtimes = loopback_getxtimes;
-  loopback_oper.setattr_x = loopback_setattr_x;
-  loopback_oper.fsetattr_x = loopback_fsetattr_x;
-  loopback_oper.setvolname = loopback_setvolname;
+  // Try to avoid using these if we can help it
+  //loopback_oper.exchange = loopback_exchange;
+  //loopback_oper.getxtimes = loopback_getxtimes;
+  //loopback_oper.setattr_x = loopback_setattr_x;
+  //loopback_oper.fsetattr_x = loopback_fsetattr_x;
+  //loopback_oper.setvolname = loopback_setvolname;
 #endif
-#ifndef __APPLE__
-  loopback_oper.lock = loopback_lock;
-#endif
-  loopback_oper.flock = loopback_flock;
-
-  loopback_oper.flag_nullpath_ok = 1;
-#ifndef __APPLE__
-  loopback_oper.flag_utime_omit_ok = 1;
-#endif
-
   res = fuse_main(argc, argv, &loopback_oper, NULL);
   fuse_opt_free_args(&args);
   return res;
 }
+
+ServerFileSystem::ServerFileSystem(const string &_absoluteFuseRoot) : FileSystem(_absoluteFuseRoot) {}
+
+}  // namespace codefs
