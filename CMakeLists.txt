@@ -43,6 +43,7 @@ find_package(GFlags REQUIRED)
 find_package(LibFUSE REQUIRED)
 find_package(ZeroMQ REQUIRED)
 find_package(Protobuf REQUIRED)
+find_package(Boost REQUIRED COMPONENTS filesystem)
 
 IF(FREEBSD)
   set(CORE_LIBRARIES util)
@@ -73,6 +74,7 @@ include_directories(
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${GFLAGS_INCLUDE_DIRS}
   ${LIBFUSE_INCLUDE_DIRS}
+  ${Boost_INCLUDE_DIRS}
   )
 
 add_library(
@@ -101,6 +103,7 @@ target_link_libraries (
   ${CMAKE_THREAD_LIBS_INIT}
   ${GFLAGS_LIBRARIES}
   ${LIBFUSE_LIBRARIES}
+  ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
 )
 
@@ -117,6 +120,7 @@ target_link_libraries (
   ${CMAKE_THREAD_LIBS_INIT}
   ${GFLAGS_LIBRARIES}
   ${LIBFUSE_LIBRARIES}
+  ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
 )
 
