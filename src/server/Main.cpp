@@ -242,6 +242,25 @@ static int loopback_create(const char *path, mode_t mode,
 static int loopback_open(const char *path, struct fuse_file_info *fi) {
   int fd;
 
+  int modes = 0;
+  if (fi->flags & O_RDONLY) {
+    // The file is opened in read-only mode
+    modes++;
+  }
+  if (fi->flags & O_WRONLY) {
+    // The file is opened in write-only mode.
+    modes++;
+    if (fi->flags & O_APPEND) {
+      // We need to get the file from the server to append
+    }
+  }
+  if (fi->flags & O_RDWR) {
+    // The file is opened in read-write mode.
+    modes++;
+  }
+  if (modes != 1) {
+    LOG(FATAL) << "Invalid open modes: " << fi->flags;
+  }
   fd = open(path, fi->flags);
   if (fd == -1) return -errno;
 
