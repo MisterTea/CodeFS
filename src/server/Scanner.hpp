@@ -2,6 +2,6 @@
 
 class Scanner {
     public:
-    static map<string, FileData> scanRecursively(const string &path);
+    static unordered_map<string, FileData> scanRecursively(const string &path);
     static FileData scanFile(const string& path);
 };

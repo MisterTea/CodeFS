@@ -1,6 +1,6 @@
 #include "Scanner.hpp"
 
-map<string, FileData> Scanner::scanRecursively(const string& path) {}
+unordered_map<string, FileData> Scanner::scanRecursively(const string& path) {}
 
 static FileData Scanner::scanFile(const string& path) {
   FileData fd;
