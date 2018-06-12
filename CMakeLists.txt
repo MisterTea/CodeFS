@@ -97,6 +97,7 @@ add_dependencies(
 add_executable (
   codefs
 
+  src/client/Client.cpp
   src/client/Main.cpp
   )
 
@@ -117,6 +118,7 @@ add_executable (
 
   src/server/ServerFileSystem.cpp
   src/server/Scanner.cpp
+  src/server/Main.cpp
   src/server/Server.cpp
   )
 

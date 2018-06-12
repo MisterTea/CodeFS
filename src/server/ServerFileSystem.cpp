@@ -782,7 +782,7 @@ static const struct fuse_opt loopback_opts[] = {
     // { "case_insensitive", offsetof(struct loopback, case_insensitive), 1 },
     FUSE_OPT_END};
 
-int main(int argc, char *argv[]) {
+int main_unused(int argc, char *argv[]) {
   int res = 0;
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 

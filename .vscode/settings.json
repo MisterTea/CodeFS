@@ -26,6 +26,7 @@
         "vector": "cpp",
         "slist": "cpp",
         "hashtable": "cpp",
-        "memory": "cpp"
+        "memory": "cpp",
+        "istream": "cpp"
     }
 }

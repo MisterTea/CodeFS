@@ -6,8 +6,9 @@
 namespace codefs {
 class FileSystem {
  public:
-  virtual void write(const string& path, const string& data) = 0;
-  virtual string read(const string& path) = 0;
+  virtual ~FileSystem() {}
+  virtual void write(const string &path, const string &data) = 0;
+  virtual string read(const string &path) = 0;
 };
 }  // namespace codefs
 
@@ -41,8 +42,8 @@ inline ssize_t llistxattr(const char *path, char *list, size_t size) {
 #define A_PREFIX "com"
 #define A_KAUTH_FILESEC_XATTR A_PREFIX ".apple.system.Security"
 #define XATTR_APPLE_PREFIX "com.apple."
-inline ssize_t lgetxattr(const char *path, const char *name,
-                        void *value, size_t size) {
+inline ssize_t lgetxattr(const char *path, const char *name, void *value,
+                         size_t size) {
   int res;
 
   if (strcmp(name, A_KAUTH_FILESEC_XATTR) == 0) {
@@ -61,7 +62,7 @@ inline ssize_t lgetxattr(const char *path, const char *name,
 }
 
 inline int lsetxattr(const char *path, const char *name, const void *value,
-              size_t size, int flags) {
+                     size_t size, int flags) {
   int res;
 
   if (!strncmp(name, XATTR_APPLE_PREFIX, sizeof(XATTR_APPLE_PREFIX) - 1)) {

@@ -2,25 +2,23 @@
 
 #include "RawSocketUtils.hpp"
 
-DEFINE_int32(port, 0, "Port to listen on");
-
 namespace codefs {
 Server::Server(shared_ptr<SocketHandler> _socketHandler, int _port,
                shared_ptr<FileSystem> _fileSystem)
     : socketHandler(_socketHandler),
       port(_port),
-      clientFd(-1),
-      fileSystem(_fileSystem) {
+      fileSystem(_fileSystem),
+      clientFd(-1) {
   socketHandler->listen(port);
 }
 
-void Server::update() {
+int Server::update() {
   timeval tv;
   fd_set rfds;
   int numCoreFds = 0;
   int maxCoreFd = 0;
   FD_ZERO(&rfds);
-  set<int> serverPortFds = socketHandler->getPortFds(FLAGS_port);
+  set<int> serverPortFds = socketHandler->getPortFds(port);
   for (int i : serverPortFds) {
     FD_SET(i, &rfds);
     maxCoreFd = max(maxCoreFd, i);
@@ -36,14 +34,16 @@ void Server::update() {
   int numFdsSet = select(maxCoreFd + 1, &rfds, NULL, NULL, &tv);
   FATAL_FAIL(numFdsSet);
   if (numFdsSet == 0) {
-    return;
+    return 0;
   }
 
   if (FD_ISSET(clientFd, &rfds)) {
     // Got a message from a client
     unsigned char header;
     RawSocketUtils::readAll(clientFd, (char*)&header, 1);
+    // TODO: update heartbeat watchdog
     switch (header) {
+      // Requests
       case CLIENT_SERVER_HEARTBEAT: {
         RawSocketUtils::writeAll(clientFd, (const char*)&header, 1);
       } break;
@@ -61,6 +61,12 @@ void Server::update() {
         RawSocketUtils::writeAll(clientFd, (const char*)&header, 1);
         RawSocketUtils::writeProto(clientFd, fpc);
       } break;
+
+      // Replies
+      case SERVER_CLIENT_HEARTBEAT: {
+      } break;
+      case SERVER_CLIENT_METADATA_UPDATE: {
+      } break;
     }
   }
 
@@ -76,5 +82,7 @@ void Server::update() {
       // TODO: Send the initial state
     }
   }
+
+  return 0;
 }
 }  // namespace codefs

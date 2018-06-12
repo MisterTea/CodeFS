@@ -1,18 +1,20 @@
 #include "Headers.hpp"
 
-#include "SocketHandler.hpp"
 #include "FileSystem.hpp"
+#include "SocketHandler.hpp"
 
 namespace codefs {
-class Server {
+class Client {
  public:
-  Server(shared_ptr<SocketHandler> _socketHandler, int _port, shared_ptr<FileSystem> _fileSystem);
+  Client(shared_ptr<SocketHandler> _socketHandler, string _hostname, int _port,
+         shared_ptr<FileSystem> _fileSystem);
   int update();
 
  protected:
   shared_ptr<SocketHandler> socketHandler;
+  string hostname;
   int port;
   shared_ptr<FileSystem> fileSystem;
-  int clientFd;
+  int serverFd;
 };
 }  // namespace codefs
