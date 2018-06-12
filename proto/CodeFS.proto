@@ -43,6 +43,8 @@ message FileData {
   optional int64 access = 1;
   optional StatData stat_data = 2;
   optional bytes symlink_contents = 3;
+  repeated string xattr_key = 4;
+  repeated bytes xattr_value = 5;
 }
 
 message FilePathAndContents {

@@ -1,6 +1,10 @@
 #include "Scanner.hpp"
 
 namespace codefs {
+const int MAX_XATTR_SIZE = 64 * 1024;
+
+Scanner::Scanner() { xattrBuffer = string(MAX_XATTR_SIZE, '\0'); }
+
 unordered_map<string, FileData> Scanner::scanRecursively(const string& path) {}
 
 FileData Scanner::scanFile(const string& path) {
@@ -39,6 +43,22 @@ FileData Scanner::scanFile(const string& path) {
     FATAL_FAIL(nbytes);
     s = s.substr(0, nbytes + 1);
     fd.set_symlink_contents(s);
+  }
+
+  // Load extended attributes
+  {
+    memset(&xattrBuffer[0], '\0', MAX_XATTR_SIZE);
+    auto listSize = llistxattr(path.c_str(), &xattrBuffer[0], MAX_XATTR_SIZE);
+    FATAL_FAIL(listSize);
+    string s(&xattrBuffer[0], listSize);
+    vector<string> keys = split(s, '\0');
+    for (string key : keys) {
+      auto xattrSize = lgetxattr(path.c_str(), key.c_str(), &xattrBuffer[0], MAX_XATTR_SIZE);
+      FATAL_FAIL(xattrSize);
+      string value(&xattrBuffer[0], xattrSize);
+      fd.add_xattr_key(key);
+      fd.add_xattr_value(value);
+    }
   }
   return fd;
 }

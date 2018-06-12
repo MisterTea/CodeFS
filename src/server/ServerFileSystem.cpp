@@ -1,5 +1,7 @@
 #include "Headers.hpp"
 
+#include "FileSystem.hpp"
+
 class FdInfo {
  public:
   string path;
@@ -265,7 +267,7 @@ static int loopback_open(const char *path, struct fuse_file_info *fi) {
   if (fd == -1) return -errno;
 
   fi->fh = fd;
-  fdMap.insert(make_pair((int64_t)fd,FdInfo(string(path))));
+  fdMap.insert(make_pair((int64_t)fd, FdInfo(string(path))));
   return 0;
 }
 
@@ -400,6 +402,18 @@ static int loopback_utimens(const char *path, const struct timespec ts[2]) {
   return 0;
 }
 
+static int loopback_listxattr(const char *path, char *list, size_t size) {
+  int res = llistxattr(path, list, size);
+  if (res == -1) return -errno;
+  return res;
+}
+
+static int loopback_removexattr(const char *path, const char *name) {
+  int res = lremovexattr(path, name);
+  if (res == -1) return -errno;
+  return 0;
+}
+
 struct loopback {};
 
 static struct loopback loopback;
@@ -418,12 +432,6 @@ typedef unsigned short u_short;
 typedef unsigned int u_int;
 typedef unsigned long u_long;
 #endif
-
-#define G_PREFIX "org"
-#define G_KAUTH_FILESEC_XATTR G_PREFIX ".apple.system.Security"
-#define A_PREFIX "com"
-#define A_KAUTH_FILESEC_XATTR A_PREFIX ".apple.system.Security"
-#define XATTR_APPLE_PREFIX "com.apple."
 
 static int loopback_exchange(const char *path1, const char *path2,
                              unsigned long options) {
@@ -714,108 +722,22 @@ static int loopback_getxtimes(const char *path, struct timespec *bkuptime,
 static int loopback_setxattr(const char *path, const char *name,
                              const char *value, size_t size, int flags,
                              uint32_t position) {
-  int res;
-
-  if (!strncmp(name, XATTR_APPLE_PREFIX, sizeof(XATTR_APPLE_PREFIX) - 1)) {
-    flags &= ~(XATTR_NOSECURITY);
+  if (position) {
+    LOG(FATAL) << "Got a non-zero position: " << position;
   }
-
-  if (!strcmp(name, A_KAUTH_FILESEC_XATTR)) {
-    char new_name[MAXPATHLEN];
-
-    memcpy(new_name, A_KAUTH_FILESEC_XATTR, sizeof(A_KAUTH_FILESEC_XATTR));
-    memcpy(new_name, G_PREFIX, sizeof(G_PREFIX) - 1);
-
-    res = setxattr(path, new_name, value, size, position, XATTR_NOFOLLOW);
-
-  } else {
-    res = setxattr(path, name, value, size, position, XATTR_NOFOLLOW);
-  }
-
-  if (res == -1) {
-    return -errno;
-  }
-
+  int res = lsetxattr(path, name, value, size, flags);
+  if (res == -1) return -errno;
   return 0;
 }
 
 static int loopback_getxattr(const char *path, const char *name, char *value,
                              size_t size, uint32_t position) {
-  int res;
-
-  if (strcmp(name, A_KAUTH_FILESEC_XATTR) == 0) {
-    char new_name[MAXPATHLEN];
-
-    memcpy(new_name, A_KAUTH_FILESEC_XATTR, sizeof(A_KAUTH_FILESEC_XATTR));
-    memcpy(new_name, G_PREFIX, sizeof(G_PREFIX) - 1);
-
-    res = getxattr(path, new_name, value, size, position, XATTR_NOFOLLOW);
-
-  } else {
-    res = getxattr(path, name, value, size, position, XATTR_NOFOLLOW);
+  if (position) {
+    LOG(FATAL) << "Got a non-zero position: " << position;
   }
-
-  if (res == -1) {
-    return -errno;
-  }
-
+  int res = lgetxattr(path, name, value, size);
+  if (res == -1) return -errno;
   return res;
-}
-
-static int loopback_listxattr(const char *path, char *list, size_t size) {
-  ssize_t res = listxattr(path, list, size, XATTR_NOFOLLOW);
-  if (res > 0) {
-    if (list) {
-      size_t len = 0;
-      char *curr = list;
-      do {
-        size_t thislen = strlen(curr) + 1;
-        if (strcmp(curr, G_KAUTH_FILESEC_XATTR) == 0) {
-          memmove(curr, curr + thislen, res - len - thislen);
-          res -= thislen;
-          break;
-        }
-        curr += thislen;
-        len += thislen;
-      } while (len < res);
-    } else {
-      /*
-      ssize_t res2 = getxattr(path, G_KAUTH_FILESEC_XATTR, NULL, 0, 0,
-                              XATTR_NOFOLLOW);
-      if (res2 >= 0) {
-          res -= sizeof(G_KAUTH_FILESEC_XATTR);
-      }
-      */
-    }
-  }
-
-  if (res == -1) {
-    return -errno;
-  }
-
-  return res;
-}
-
-static int loopback_removexattr(const char *path, const char *name) {
-  int res;
-
-  if (strcmp(name, A_KAUTH_FILESEC_XATTR) == 0) {
-    char new_name[MAXPATHLEN];
-
-    memcpy(new_name, A_KAUTH_FILESEC_XATTR, sizeof(A_KAUTH_FILESEC_XATTR));
-    memcpy(new_name, G_PREFIX, sizeof(G_PREFIX) - 1);
-
-    res = removexattr(path, new_name, XATTR_NOFOLLOW);
-
-  } else {
-    res = removexattr(path, name, XATTR_NOFOLLOW);
-  }
-
-  if (res == -1) {
-    return -errno;
-  }
-
-  return 0;
 }
 
 static int loopback_setvolname(const char *name) { return 0; }
@@ -832,13 +754,6 @@ void loopback_destroy(void *userdata) { /* nothing */
 
 #else
 
-static int loopback_setxattr(const char *path, const char *name,
-                             const char *value, size_t size, int flags) {
-  int res = lsetxattr(path, name, value, size, flags);
-  if (res == -1) return -errno;
-  return 0;
-}
-
 static int loopback_getxattr(const char *path, const char *name, char *value,
                              size_t size) {
   int res = lgetxattr(path, name, value, size);
@@ -846,14 +761,9 @@ static int loopback_getxattr(const char *path, const char *name, char *value,
   return res;
 }
 
-static int loopback_listxattr(const char *path, char *list, size_t size) {
-  int res = llistxattr(path, list, size);
-  if (res == -1) return -errno;
-  return res;
-}
-
-static int loopback_removexattr(const char *path, const char *name) {
-  int res = lremovexattr(path, name);
+static int loopback_setxattr(const char *path, const char *name,
+                             const char *value, size_t size, int flags) {
+  int res = lsetxattr(path, name, value, size, flags);
   if (res == -1) return -errno;
   return 0;
 }
