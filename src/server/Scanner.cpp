@@ -5,7 +5,32 @@ const int MAX_XATTR_SIZE = 64 * 1024;
 
 Scanner::Scanner() { xattrBuffer = string(MAX_XATTR_SIZE, '\0'); }
 
-unordered_map<string, FileData> Scanner::scanRecursively(const string& path) {}
+void Scanner::scanRecursively(const string& path_string,
+                              unordered_map<string, FileData>* result) {
+  boost::filesystem::path pt(path_string);
+  try {
+    if (exists(pt)) {
+      // path exists
+      for (auto& p : boost::filesystem::directory_iterator(pt)) {
+        string p_str = p.path().string();
+        if (is_regular_file(p)) {
+          FileData p_filedata = scanFile(p_str);
+          result->emplace(p_str, p_filedata);
+        } else if (is_directory(p)) {
+          scanRecursively(p_str, result);
+        } else {
+          LOG(ERROR)
+              << p << " exists, but is neither a regular file nor a directory";
+        }
+      }
+    } else {
+      LOG(FATAL) << "path " << path_string << "doesn't exist!";
+    }
+  } catch (const boost::filesystem::filesystem_error& ex) {
+    LOG(FATAL) << ex.what();
+  }
+  return;
+}
 
 FileData Scanner::scanFile(const string& path) {
   FileData fd;
@@ -53,7 +78,8 @@ FileData Scanner::scanFile(const string& path) {
     string s(&xattrBuffer[0], listSize);
     vector<string> keys = split(s, '\0');
     for (string key : keys) {
-      auto xattrSize = lgetxattr(path.c_str(), key.c_str(), &xattrBuffer[0], MAX_XATTR_SIZE);
+      auto xattrSize =
+          lgetxattr(path.c_str(), key.c_str(), &xattrBuffer[0], MAX_XATTR_SIZE);
       FATAL_FAIL(xattrSize);
       string value(&xattrBuffer[0], xattrSize);
       fd.add_xattr_key(key);

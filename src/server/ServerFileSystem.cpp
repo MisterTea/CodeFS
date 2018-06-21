@@ -775,17 +775,18 @@ int main_unused(int argc, char *argv[]) {
   loopback_oper.removexattr = loopback_removexattr;
 #ifdef __APPLE__
   // Try to avoid using these if we can help it
-  //loopback_oper.exchange = loopback_exchange;
-  //loopback_oper.getxtimes = loopback_getxtimes;
-  //loopback_oper.setattr_x = loopback_setattr_x;
-  //loopback_oper.fsetattr_x = loopback_fsetattr_x;
-  //loopback_oper.setvolname = loopback_setvolname;
+  // loopback_oper.exchange = loopback_exchange;
+  // loopback_oper.getxtimes = loopback_getxtimes;
+  // loopback_oper.setattr_x = loopback_setattr_x;
+  // loopback_oper.fsetattr_x = loopback_fsetattr_x;
+  // loopback_oper.setvolname = loopback_setvolname;
 #endif
   res = fuse_main(argc, argv, &loopback_oper, NULL);
   fuse_opt_free_args(&args);
   return res;
 }
 
-ServerFileSystem::ServerFileSystem(const string &_absoluteFuseRoot) : FileSystem(_absoluteFuseRoot) {}
+ServerFileSystem::ServerFileSystem(const string &_absoluteFuseRoot)
+    : FileSystem(_absoluteFuseRoot) {}
 
 }  // namespace codefs

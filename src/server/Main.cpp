@@ -1,9 +1,9 @@
 #include "Server.hpp"
 
-#include "ServerFileSystem.hpp"
-#include "UnixSocketHandler.hpp"
 #include "LogHandler.hpp"
 #include "Scanner.hpp"
+#include "ServerFileSystem.hpp"
+#include "UnixSocketHandler.hpp"
 
 DEFINE_int32(port, 2298, "Port to listen on");
 DEFINE_string(path, "", "Absolute path containing code for codefs to monitor");
@@ -21,7 +21,7 @@ int main(int argc, char *argv[]) {
   // default max log file size is 20MB for etserver
   string maxlogsize = "20971520";
   codefs::LogHandler::SetupLogFile(&defaultConf, "/tmp/codefs_server.log",
-                               maxlogsize);
+                                   maxlogsize);
 
   // Reconfigure default logger to apply settings above
   el::Loggers::reconfigureLogger("default", defaultConf);
@@ -32,7 +32,11 @@ int main(int argc, char *argv[]) {
 
   // For now, just scan and then exit
   Scanner scanner;
-  scanner.scanRecursively(FLAGS_path);
+  unordered_map<string, FileData> result;
+  scanner.scanRecursively(FLAGS_path, &result);
+  // for (auto &i: result) {
+  //  cout << i.first << endl;
+  //}
   exit(0);
 
   shared_ptr<SocketHandler> socketHandler(new UnixSocketHandler());

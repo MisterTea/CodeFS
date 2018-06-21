@@ -6,7 +6,8 @@ namespace codefs {
 class Scanner {
  public:
   Scanner();
-  unordered_map<string, FileData> scanRecursively(const string& path);
+  void scanRecursively(const string& path,
+                       unordered_map<string, FileData>* result);
   FileData scanFile(const string& path);
 
  protected:
