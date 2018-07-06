@@ -44,6 +44,7 @@ int main(int argc, char *argv[]) {
   Server server(socketHandler, FLAGS_port, fileSystem);
   fileSystem->setCallback(&server);
   fileSystem->startFuse();
+  server.init();
   while (true) {
     int retval = server.update();
     if (retval) {

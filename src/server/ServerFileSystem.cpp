@@ -246,18 +246,19 @@ static int loopback_open(const char *path, struct fuse_file_info *fi) {
   int fd;
 
   int modes = 0;
-  if (fi->flags & O_RDONLY) {
+  int readWriteMode = (fi->flags & O_ACCMODE);
+  if (readWriteMode == O_RDONLY) {
     // The file is opened in read-only mode
     modes++;
   }
-  if (fi->flags & O_WRONLY) {
+  if (readWriteMode == O_WRONLY) {
     // The file is opened in write-only mode.
     modes++;
     if (fi->flags & O_APPEND) {
       // We need to get the file from the server to append
     }
   }
-  if (fi->flags & O_RDWR) {
+  if (readWriteMode == O_RDWR) {
     // The file is opened in read-write mode.
     modes++;
   }

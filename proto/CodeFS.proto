@@ -2,12 +2,13 @@ syntax = "proto2";
 package codefs;
 
 enum MessageHeaders {
-  CLIENT_SERVER_HEARTBEAT = 1;
-  CLIENT_SERVER_UPDATE_FILE = 2;
-  CLIENT_SERVER_REQUEST_FILE = 3;
+  CLIENT_SERVER_INIT = 1;
+  CLIENT_SERVER_HEARTBEAT = 2;
+  CLIENT_SERVER_UPDATE_FILE = 3;
+  CLIENT_SERVER_REQUEST_FILE = 4;
 
-  SERVER_CLIENT_HEARTBEAT = 4;
-  SERVER_CLIENT_METADATA_UPDATE = 5;
+  SERVER_CLIENT_HEARTBEAT = 5;
+  SERVER_CLIENT_METADATA_UPDATE = 6;
 }
 
 message StatVfsData {
@@ -43,14 +44,19 @@ message StatData {
 };
 
 message FileData {
-  optional int64 access = 1;
-  optional StatData stat_data = 2;
-  optional bytes symlink_contents = 3;
-  repeated string xattr_key = 4;
-  repeated bytes xattr_value = 5;
+  optional string path = 1;
+  optional int64 access = 2;
+  optional StatData stat_data = 3;
+  optional bytes symlink_contents = 4;
+  repeated string xattr_key = 5;
+  repeated bytes xattr_value = 6;
 }
 
 message FilePathAndContents {
   optional string path = 1;
   optional bytes contents = 2;
+}
+
+message FilesystemData {
+  repeated FileData nodes = 1;
 }

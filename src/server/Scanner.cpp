@@ -13,10 +13,10 @@ void Scanner::scanRecursively(const string& path_string,
       // path exists
       for (auto& p : boost::filesystem::directory_iterator(pt)) {
         string p_str = p.path().string();
-        if (is_regular_file(p)) {
+        if (boost::filesystem::is_regular_file(p.path())) {
           FileData p_filedata = scanFile(p_str);
           result->emplace(p_str, p_filedata);
-        } else if (is_directory(p)) {
+        } else if (boost::filesystem::is_directory(p.path())) {
           scanRecursively(p_str, result);
         } else {
           LOG(ERROR)
@@ -34,6 +34,7 @@ void Scanner::scanRecursively(const string& path_string,
 
 FileData Scanner::scanFile(const string& path) {
   FileData fd;
+  fd.set_path(path);
   fd.set_access(access(path.c_str(), R_OK | W_OK | X_OK));
   struct stat fileStat;
   FATAL_FAIL(lstat(path.c_str(), &fileStat));

@@ -8,7 +8,10 @@ Server::Server(shared_ptr<SocketHandler> _socketHandler, int _port,
     : socketHandler(_socketHandler),
       port(_port),
       fileSystem(_fileSystem),
-      clientFd(-1) {
+      clientFd(-1) {}
+
+void Server::init() {
+  scanner.scanRecursively(fileSystem->fuseToAbsolute("/"), &fsData);
   socketHandler->listen(port);
 }
 
@@ -61,12 +64,23 @@ int Server::update() {
         RawSocketUtils::writeAll(clientFd, (const char *)&header, 1);
         RawSocketUtils::writeProto(clientFd, fpc);
       } break;
+      case CLIENT_SERVER_INIT: {
+        FilesystemData fsDataProto;
+        for (auto &it : fsData) {
+          *(fsDataProto.add_nodes()) = it.second;
+        }
+        RawSocketUtils::writeAll(clientFd, (const char *)&header, 1);
+        RawSocketUtils::writeProto(clientFd, fsDataProto);
+      } break;
 
       // Replies
       case SERVER_CLIENT_HEARTBEAT: {
       } break;
       case SERVER_CLIENT_METADATA_UPDATE: {
       } break;
+
+      default:
+       LOG(FATAL) << "Invalid packet header: " << int(header);
     }
   }
 

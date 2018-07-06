@@ -1,6 +1,7 @@
 #include "Client.hpp"
 
 #include "RawSocketUtils.hpp"
+#include "FileUtils.hpp"
 
 namespace codefs {
 Client::Client(shared_ptr<SocketHandler> _socketHandler, string _hostname,
@@ -11,6 +12,20 @@ Client::Client(shared_ptr<SocketHandler> _socketHandler, string _hostname,
       fileSystem(_fileSystem),
       serverFd(-1) {
   serverFd = socketHandler->connect(hostname, port);
+
+  unsigned char header;
+  header = CLIENT_SERVER_INIT;
+  RawSocketUtils::writeAll(serverFd, (const char*)&header, 1);
+
+  RawSocketUtils::readAll(serverFd, (char*)&header, 1);
+  if (header != CLIENT_SERVER_INIT) {
+    LOG(FATAL) << "Did not get init as the first packet";
+  }
+  FilesystemData fsDataProto = RawSocketUtils::readProto<FilesystemData>(serverFd);
+  for (auto& it : fsDataProto.nodes()) {
+    fsData[it.path()] = it;
+    FileUtils::touch(fileSystem->fuseToAbsolute(it.path()));
+  }
 }
 
 int Client::update() {

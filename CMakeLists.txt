@@ -87,6 +87,7 @@ add_library(
   src/base/SocketHandler.cpp
   src/base/UnixSocketHandler.cpp
   src/base/RawSocketUtils.cpp
+  src/base/FileUtils.cpp
   ${CODEFS_SRCS}
 )
 add_dependencies(

@@ -16,5 +16,6 @@ class Client {
   int port;
   shared_ptr<FileSystem> fileSystem;
   int serverFd;
+  unordered_map<string, FileData> fsData;
 };
 }  // namespace codefs

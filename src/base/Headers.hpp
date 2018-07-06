@@ -83,6 +83,7 @@ extern "C" {
 #include "CodeFS.pb.h"
 
 #include <boost/algorithm/string.hpp>
+#include <boost/filesystem.hpp>
 
 using namespace std;
 
