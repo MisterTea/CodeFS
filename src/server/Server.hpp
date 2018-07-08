@@ -4,24 +4,22 @@
 #include "Headers.hpp"
 
 #include "Scanner.hpp"
-#include "FileSystem.hpp"
+#include "ServerFileSystem.hpp"
 #include "SocketHandler.hpp"
 
 namespace codefs {
-class Server : public FileSystem::FsCallbackHandler {
+class Server {
  public:
   Server(shared_ptr<SocketHandler> _socketHandler, int _port,
-         shared_ptr<FileSystem> _fileSystem);
+         shared_ptr<ServerFileSystem> _fileSystem);
   void init();
   int update();
-  virtual void fileChanged(const string &fusePath, const string &absolutePath);
 
  protected:
   shared_ptr<SocketHandler> socketHandler;
   int port;
-  shared_ptr<FileSystem> fileSystem;
+  shared_ptr<ServerFileSystem> fileSystem;
   int clientFd;
-  unordered_map<string, FileData> fsData;
   Scanner scanner;
 };
 }  // namespace codefs

@@ -8,13 +8,12 @@
 namespace codefs {
 class Scanner {
  public:
-  Scanner();
-  void scanRecursively(const string& path,
-                       unordered_map<string, FileData>* result);
-  FileData scanFile(const string& path);
-
- protected:
-  string xattrBuffer;
+  static void scanRecursively(FileSystem* fileSystem,
+                              const string& path,
+                              unordered_map<string, FileData>* result);
+  static FileData scanNode(FileSystem* fileSystem,
+                           const string& path,
+                           unordered_map<string, FileData>* result);
 };
 }  // namespace codefs
 

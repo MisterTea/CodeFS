@@ -1,12 +1,15 @@
 #include "Scanner.hpp"
 
+#include "FileSystem.hpp"
+
 namespace codefs {
 const int MAX_XATTR_SIZE = 64 * 1024;
 
-Scanner::Scanner() { xattrBuffer = string(MAX_XATTR_SIZE, '\0'); }
-
-void Scanner::scanRecursively(const string& path_string,
+void Scanner::scanRecursively(FileSystem* fileSystem, const string& path_string,
                               unordered_map<string, FileData>* result) {
+  LOG(INFO) << "SCANNING DIRECTORY " << path_string;
+  FileData p_filedata = scanNode(fileSystem, path_string, result);
+
   boost::filesystem::path pt(path_string);
   try {
     if (exists(pt)) {
@@ -14,10 +17,10 @@ void Scanner::scanRecursively(const string& path_string,
       for (auto& p : boost::filesystem::directory_iterator(pt)) {
         string p_str = p.path().string();
         if (boost::filesystem::is_regular_file(p.path())) {
-          FileData p_filedata = scanFile(p_str);
-          result->emplace(p_str, p_filedata);
+          LOG(INFO) << "SCANNING FILE " << p_str;
+          FileData p_filedata = scanNode(fileSystem, p_str, result);
         } else if (boost::filesystem::is_directory(p.path())) {
-          scanRecursively(p_str, result);
+          scanRecursively(fileSystem, p_str, result);
         } else {
           LOG(ERROR)
               << p << " exists, but is neither a regular file nor a directory";
@@ -32,26 +35,39 @@ void Scanner::scanRecursively(const string& path_string,
   return;
 }
 
-FileData Scanner::scanFile(const string& path) {
+FileData Scanner::scanNode(FileSystem* fileSystem, const string& path,
+                           unordered_map<string, FileData>* result) {
+  LOG(INFO) << "SCANNING NODE : " << path;
+
   FileData fd;
-  fd.set_path(path);
-  fd.set_access(access(path.c_str(), R_OK | W_OK | X_OK));
+
+  if (access(path.c_str(), F_OK) != 0) {
+    // The file is gone
+    result->erase(fileSystem->absoluteToFuse(path));
+    return fd;
+  }
+
+  fd.set_path(fileSystem->absoluteToFuse(path));
+
+  if (access(path.c_str(), R_OK) == 0) {
+    fd.set_can_read(true);
+  } else {
+    fd.set_can_read(false);
+  }
+  if (access(path.c_str(), W_OK) == 0) {
+    fd.set_can_write(true);
+  } else {
+    fd.set_can_write(false);
+  }
+  if (access(path.c_str(), X_OK) == 0) {
+    fd.set_can_execute(true);
+  } else {
+    fd.set_can_execute(false);
+  }
   struct stat fileStat;
   FATAL_FAIL(lstat(path.c_str(), &fileStat));
   StatData fStat;
-  fStat.set_dev(fileStat.st_dev);
-  fStat.set_ino(fileStat.st_ino);
-  fStat.set_mode(fileStat.st_mode);
-  fStat.set_nlink(fileStat.st_nlink);
-  fStat.set_uid(fileStat.st_uid);
-  fStat.set_gid(fileStat.st_gid);
-  fStat.set_rdev(fileStat.st_rdev);
-  fStat.set_size(fileStat.st_size);
-  fStat.set_blksize(fileStat.st_blksize);
-  fStat.set_blocks(fileStat.st_blocks);
-  fStat.set_atime(fileStat.st_atime);
-  fStat.set_mtime(fileStat.st_mtime);
-  fStat.set_ctime(fileStat.st_ctime);
+  FileSystem::statToProto(fileStat, &fStat);
   *(fd.mutable_stat_data()) = fStat;
   if (S_ISLNK(fileStat.st_mode)) {
     int bufsiz = fileStat.st_size + 1;
@@ -71,8 +87,17 @@ FileData Scanner::scanFile(const string& path) {
     fd.set_symlink_contents(s);
   }
 
+  if (S_ISDIR(fileStat.st_mode)) {
+    // Populate children
+    for (auto& it : boost::filesystem::directory_iterator(path)) {
+      LOG(INFO) << "FOUND CHILD: " << it.path().filename().string();
+      fd.add_child_node(it.path().filename().string());
+    }
+  }
+
   // Load extended attributes
   {
+    string xattrBuffer = string(MAX_XATTR_SIZE, '\0');
     memset(&xattrBuffer[0], '\0', MAX_XATTR_SIZE);
     auto listSize = llistxattr(path.c_str(), &xattrBuffer[0], MAX_XATTR_SIZE);
     FATAL_FAIL(listSize);
@@ -87,6 +112,8 @@ FileData Scanner::scanFile(const string& path) {
       fd.add_xattr_value(value);
     }
   }
+
+  (*result)[fileSystem->absoluteToFuse(path)] = fd;
   return fd;
 }
 }  // namespace codefs

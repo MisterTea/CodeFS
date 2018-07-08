@@ -45,11 +45,14 @@ message StatData {
 
 message FileData {
   optional string path = 1;
-  optional int64 access = 2;
-  optional StatData stat_data = 3;
-  optional bytes symlink_contents = 4;
-  repeated string xattr_key = 5;
-  repeated bytes xattr_value = 6;
+  optional bool can_read = 2;
+  optional bool can_write = 3;
+  optional bool can_execute = 4;
+  optional StatData stat_data = 5;
+  optional bytes symlink_contents = 6;
+  repeated string xattr_key = 7;
+  repeated bytes xattr_value = 8;
+  repeated string child_node = 9;
 }
 
 message FilePathAndContents {

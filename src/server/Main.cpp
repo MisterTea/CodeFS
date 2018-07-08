@@ -3,12 +3,46 @@
 #include "LogHandler.hpp"
 #include "Scanner.hpp"
 #include "ServerFileSystem.hpp"
+#include "ServerFuseAdapter.hpp"
 #include "UnixSocketHandler.hpp"
 
 DEFINE_int32(port, 2298, "Port to listen on");
 DEFINE_string(path, "", "Absolute path containing code for codefs to monitor");
 
 namespace codefs {
+struct loopback {};
+
+static struct loopback loopback;
+
+static const struct fuse_opt codefs_opts[] = {
+    // { "case_insensitive", offsetof(struct loopback, case_insensitive), 1 },
+    FUSE_OPT_END};
+
+void runFuse(char *binaryLocation, shared_ptr<ServerFileSystem> fileSystem) {
+  int argc = 4;
+  const char *const_argv[] = {binaryLocation, "/tmp/mount", "-d", "-s"};
+  char **argv = (char **)const_argv;
+  struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
+
+  if (fuse_opt_parse(&args, &loopback, codefs_opts, NULL) == -1) {
+    exit(1);
+  }
+
+  umask(0);
+  fuse_operations codefs_oper;
+  memset(&codefs_oper, 0, sizeof(fuse_operations));
+
+  ServerFuseAdapter adapter;
+  adapter.assignServerCallbacks(fileSystem, &codefs_oper);
+
+  int res = fuse_main(argc, argv, &codefs_oper, NULL);
+  fuse_opt_free_args(&args);
+  if (res) {
+    LOG(FATAL) << "Unclean exit from fuse thread: " << res
+               << " (errno: " << errno << ")";
+  }
+}
+
 int main(int argc, char *argv[]) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
   srand(1);
@@ -30,21 +64,16 @@ int main(int argc, char *argv[]) {
     LOG(FATAL) << "Please specify a --path flag containing the code path";
   }
 
-  // For now, just scan and then exit
-  Scanner scanner;
-  unordered_map<string, FileData> result;
-  scanner.scanRecursively(FLAGS_path, &result);
-  // for (auto &i: result) {
-  //  cout << i.first << endl;
-  //}
-  exit(0);
-
   shared_ptr<SocketHandler> socketHandler(new UnixSocketHandler());
-  shared_ptr<FileSystem> fileSystem(new ServerFileSystem(FLAGS_path));
+  shared_ptr<ServerFileSystem> fileSystem(new ServerFileSystem(FLAGS_path));
   Server server(socketHandler, FLAGS_port, fileSystem);
-  fileSystem->setCallback(&server);
-  fileSystem->startFuse();
+  // Sleep for 100ms for fuse to wake up
+  usleep(100 * 1000);
   server.init();
+
+  // There is a chicken-and-egg issue where FUSE needs metadata and scanner shuold run before Fuse.  will fix later.
+  shared_ptr<thread> fuseThread(new thread(runFuse, argv[0], fileSystem));
+
   while (true) {
     int retval = server.update();
     if (retval) {

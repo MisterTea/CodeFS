@@ -6,21 +6,41 @@
 namespace codefs {
 class FileSystem {
  public:
-  class FsCallbackHandler {
-    virtual void fileChanged(const string &fusePath,
-                             const string &absolutePath) = 0;
+  class DirectoryPointer {
+   public:
+    string directory;
+    int offset;
+
+    DirectoryPointer(const string &_directory)
+        : directory(_directory), offset(0) {}
+  };
+
+  class FdInfo {
+   public:
+    string path;
+
+    FdInfo(const string &_path) : path(_path) {}
   };
 
   explicit FileSystem(const string &_absoluteFuseRoot)
       : absoluteFuseRoot(_absoluteFuseRoot) {
-        boost::trim_right_if(absoluteFuseRoot, boost::is_any_of("/"));
-      }
-  void setCallback(FileSystem::FsCallbackHandler *_callback) {
-    callback = _callback;
+    boost::trim_right_if(absoluteFuseRoot, boost::is_any_of("/"));
   }
-  virtual void write(const string &path, const string &data) = 0;
-  virtual string read(const string &path) = 0;
-  virtual void startFuse() = 0;
+
+  virtual const FileData *getNode(const string &path) {
+    auto it = allFileData.find(path);
+    if (it == allFileData.end()) {
+      return NULL;
+    }
+    return &(it->second);
+  }
+  virtual const FileData *getNodeOrFatal(const string &path) {
+    auto it = allFileData.find(path);
+    if (it == allFileData.end()) {
+      LOG(FATAL) << "Called getNode on a path that doesn't exist: " << path;
+    }
+    return &(it->second);
+  }
 
   virtual string absoluteToFuse(const string &absolutePath) {
     if (absolutePath.find(absoluteFuseRoot) != 0) {
@@ -28,14 +48,59 @@ class FileSystem {
                     "the fuse FS: "
                  << absolutePath << " " << absoluteFuseRoot;
     }
-    return absolutePath.substr(absoluteFuseRoot.size());
+    string relative = absolutePath.substr(absoluteFuseRoot.size());
+    if (relative.length() == 0) {
+      return "/";
+    } else {
+      return relative;
+    }
   }
   virtual string fuseToAbsolute(const string &fusePath) {
     return absoluteFuseRoot + fusePath;
   }
 
+  inline bool hasDirectory(const string &path) {
+    return allFileData.find(path) != allFileData.end() &&
+           S_ISDIR(allFileData.find(path)->second.stat_data().mode());
+  }
+
+  static inline void statToProto(const struct stat &fileStat, StatData *fStat) {
+    fStat->set_dev(fileStat.st_dev);
+    fStat->set_ino(fileStat.st_ino);
+    fStat->set_mode(fileStat.st_mode);
+    fStat->set_nlink(fileStat.st_nlink);
+    fStat->set_uid(fileStat.st_uid);
+    fStat->set_gid(fileStat.st_gid);
+    fStat->set_rdev(fileStat.st_rdev);
+    fStat->set_size(fileStat.st_size);
+    fStat->set_blksize(fileStat.st_blksize);
+    fStat->set_blocks(fileStat.st_blocks);
+    fStat->set_atime(fileStat.st_atime);
+    fStat->set_mtime(fileStat.st_mtime);
+    fStat->set_ctime(fileStat.st_ctime);
+  }
+
+  static inline void protoToStat(const StatData &fStat, struct stat *fileStat) {
+    fileStat->st_dev = fStat.dev();
+    fileStat->st_ino = fStat.ino();
+    fileStat->st_mode = fStat.mode();
+    fileStat->st_nlink = fStat.nlink();
+    fileStat->st_uid = fStat.uid();
+    fileStat->st_gid = fStat.gid();
+    fileStat->st_rdev = fStat.rdev();
+    fileStat->st_size = fStat.size();
+    fileStat->st_blksize = fStat.blksize();
+    fileStat->st_blocks = fStat.blocks();
+    fileStat->st_atime = fStat.atime();
+    fileStat->st_mtime = fStat.mtime();
+    fileStat->st_ctime = fStat.ctime();
+  }
+
+  unordered_map<int64_t, FdInfo> fdMap;
+  unordered_map<int64_t, DirectoryPointer *> dirpMap;
+  unordered_map<string, FileData> allFileData;
+
  protected:
-  FileSystem::FsCallbackHandler *callback;
   string absoluteFuseRoot;
   shared_ptr<thread> fuseThread;
 };

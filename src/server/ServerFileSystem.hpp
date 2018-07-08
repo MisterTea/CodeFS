@@ -3,16 +3,19 @@
 
 #include "FileSystem.hpp"
 
-#include "Server.hpp"
-
 namespace codefs {
 class ServerFileSystem : public FileSystem {
  public:
   explicit ServerFileSystem(const string &_absoluteFuseRoot);
   virtual ~ServerFileSystem() {}
-  virtual void write(const string &path, const string &data) {}
-  virtual string read(const string &path) {}
-  virtual void startFuse() {}
+  void rescan(const string &absolutePath);
+  inline void rescanPathAndParent(const string &absolutePath) {
+    rescan(absolutePath);
+    rescan(boost::filesystem::path(absolutePath).parent_path().string());
+  }
+
+ protected:
+  unordered_set<string> pathsToRescan;
 };
 }  // namespace codefs
 

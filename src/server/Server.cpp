@@ -4,14 +4,14 @@
 
 namespace codefs {
 Server::Server(shared_ptr<SocketHandler> _socketHandler, int _port,
-               shared_ptr<FileSystem> _fileSystem)
+               shared_ptr<ServerFileSystem> _fileSystem)
     : socketHandler(_socketHandler),
       port(_port),
       fileSystem(_fileSystem),
       clientFd(-1) {}
 
 void Server::init() {
-  scanner.scanRecursively(fileSystem->fuseToAbsolute("/"), &fsData);
+  Scanner::scanRecursively(fileSystem.get(), fileSystem->fuseToAbsolute("/"), &(fileSystem->allFileData));
   socketHandler->listen(port);
 }
 
@@ -53,20 +53,20 @@ int Server::update() {
       case CLIENT_SERVER_UPDATE_FILE: {
         FilePathAndContents fpc =
             RawSocketUtils::readProto<FilePathAndContents>(clientFd);
-        fileSystem->write(fpc.path(), fpc.contents());
+        //fileSystem->write(fpc.path(), fpc.contents());
         RawSocketUtils::writeAll(clientFd, (const char *)&header, 1);
       } break;
       case CLIENT_SERVER_REQUEST_FILE: {
         string path = RawSocketUtils::readMessage(clientFd);
         FilePathAndContents fpc;
         fpc.set_path(path);
-        fpc.set_contents(fileSystem->read(path));
+        //fpc.set_contents(fileSystem->read(path));
         RawSocketUtils::writeAll(clientFd, (const char *)&header, 1);
         RawSocketUtils::writeProto(clientFd, fpc);
       } break;
       case CLIENT_SERVER_INIT: {
         FilesystemData fsDataProto;
-        for (auto &it : fsData) {
+        for (auto &it : fileSystem->allFileData) {
           *(fsDataProto.add_nodes()) = it.second;
         }
         RawSocketUtils::writeAll(clientFd, (const char *)&header, 1);
@@ -100,5 +100,4 @@ int Server::update() {
   return 0;
 }
 
-void Server::fileChanged(const string &fusePath, const string &absolutePath) {}
 }  // namespace codefs

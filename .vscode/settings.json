@@ -29,6 +29,11 @@
         "memory": "cpp",
         "istream": "cpp",
         "iosfwd": "cpp",
-        "ostream": "cpp"
+        "ostream": "cpp",
+        "__locale": "cpp",
+        "__bit_reference": "cpp",
+        "__string": "cpp",
+        "ios": "cpp",
+        "thread": "cpp"
     }
 }

@@ -88,6 +88,7 @@ add_library(
   src/base/UnixSocketHandler.cpp
   src/base/RawSocketUtils.cpp
   src/base/FileUtils.cpp
+  src/base/FuseAdapter.cpp
   ${CODEFS_SRCS}
 )
 add_dependencies(
@@ -121,6 +122,7 @@ add_executable (
   src/server/Scanner.cpp
   src/server/Main.cpp
   src/server/Server.cpp
+  src/server/ServerFuseAdapter.cpp
   )
 
 target_link_libraries (
