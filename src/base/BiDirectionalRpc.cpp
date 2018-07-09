@@ -1,12 +1,13 @@
 #include "BiDirectionalRpc.hpp"
 
 namespace codefs {
-BiDirectionalRpc::BiDirectionalRpc(Handler* _handler,
-                                               const string& address, bool bind)
+BiDirectionalRpc::BiDirectionalRpc(Handler* _handler, const string& address,
+                                   bool bind)
     : handler(_handler) {
   context = shared_ptr<zmq::context_t>(new zmq::context_t(4));
   socket = shared_ptr<zmq::socket_t>(
       new zmq::socket_t(*(context.get()), ZMQ_DEALER));
+  socket->setsockopt(ZMQ_LINGER, 3000);
   if (bind) {
     LOG(INFO) << "Binding on address: " << address;
     socket->bind(address);
@@ -15,11 +16,36 @@ BiDirectionalRpc::BiDirectionalRpc(Handler* _handler,
   }
 }
 
+BiDirectionalRpc::~BiDirectionalRpc() {
+  if (context.get() || socket.get()) {
+    LOG(FATAL) << "Tried to destroy an RPC instance without calling shutdown";
+  }
+}
+
+void BiDirectionalRpc::shutdown() {
+  LOG(INFO) << "CLOSING SOCKET";
+  socket->close();
+  LOG(INFO) << "KILLING SOCKET";
+  socket.reset();
+  LOG(INFO) << "CLOSING CONTEXT";
+  context->close();
+  LOG(INFO) << "KILLING CONTEXT";
+  context.reset();
+  LOG(INFO) << "SHUTDOWN COMPLETE";
+}
+
 void BiDirectionalRpc::heartbeat() {
-  if (!outgoingRequests.empty()) {
-    sendRequest(outgoingRequests.begin()->first);
-  } else if (!outgoingReplies.empty()) {
-    sendReply(outgoingReplies.begin()->first);
+  if (!outgoingReplies.empty() &&
+      (outgoingRequests.empty() || rand() % 2 == 0)) {
+    // Re-send a random reply
+    auto it = outgoingReplies.begin();
+    std::advance(it, rand() % outgoingReplies.size());
+    sendReply(it->first);
+  } else if (!outgoingRequests.empty()) {
+    // Re-send a random request
+    auto it = outgoingRequests.begin();
+    std::advance(it, rand() % outgoingRequests.size());
+    sendRequest(it->first);
   } else {
     zmq::message_t message(1);
     message.data<char>()[0] = HEARTBEAT;

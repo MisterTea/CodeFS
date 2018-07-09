@@ -14,6 +14,8 @@ class BiDirectionalRpc {
   };
 
   BiDirectionalRpc(Handler* _handler, const string& address, bool bind);
+  ~BiDirectionalRpc();
+  void shutdown();
   void heartbeat();
   void update();
   sole::uuid request(const string& payload);

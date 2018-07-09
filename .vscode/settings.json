@@ -36,6 +36,10 @@
         "ios": "cpp",
         "thread": "cpp",
         "*.ipp": "cpp",
-        "functional": "cpp"
+        "functional": "cpp",
+        "fstream": "cpp",
+        "locale": "cpp",
+        "future": "cpp",
+        "forward_list": "cpp"
     }
 }
