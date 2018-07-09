@@ -79,6 +79,9 @@ extern "C" {
 #include "base64.hpp"
 #include "json.hpp"
 #include "sole.hpp"
+#include "zmq.hpp"
+#include "zmq_addon.hpp"
+#include "msgpack.hpp"
 
 #include "CodeFS.pb.h"
 
@@ -96,6 +99,14 @@ using json = nlohmann::json;
 
 // The protocol version supported by this binary
 static const int PROTOCOL_VERSION = 1;
+
+#define FATAL_IF_FALSE(X) \
+  if (((X) == false))    \
+    LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno);
+
+#define FATAL_IF_FALSE_NOT_EAGAIN(X) \
+  if (((X) == false) && errno != EAGAIN)    \
+    LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno);
 
 #define FATAL_FAIL(X) \
   if (((X) == -1))    \

@@ -5,6 +5,7 @@
             "includePath": [
                 "${workspaceFolder}",
                 "${workspaceFolder}/build",
+                "${workspaceFolder}/external/msgpack-3.0.1/include",
                 "${workspaceFolder}/src/base",
                 "${workspaceFolder}/src/client",
                 "${workspaceFolder}/src/server",
@@ -43,6 +44,7 @@
                 "/usr/include",
                 "/usr/local/include",
                 "${workspaceFolder}",
+                "${workspaceFolder}/external/msgpack-3.0.1/include",
                 "${workspaceFolder}/build",
                 "${workspaceFolder}/src/base",
                 "${workspaceFolder}/src/client",
@@ -66,6 +68,7 @@
                 "C:/Program Files (x86)/Microsoft Visual Studio 14.0/VC/include",
                 "${workspaceFolder}",
                 "${workspaceFolder}/build",
+                "${workspaceFolder}/external/msgpack-3.0.1/include",
                 "${workspaceFolder}/src/base",
                 "${workspaceFolder}/src/client",
                 "${workspaceFolder}/src/server"

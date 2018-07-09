@@ -16,7 +16,7 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DELPP_NO_DEFAULT_LOG_FILE -DELPP_FEATUR
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64")
 
 IF(BUILD_TEST)
-  add_subdirectory(${CMAKE_SOURCE_DIR}/external/googletest)
+  add_subdirectory(${CMAKE_SOURCE_DIR}/external/googletest-1.8.0)
 ENDIF(BUILD_TEST)
 IF(CODE_COVERAGE)
   if(UNIX)
@@ -70,11 +70,13 @@ add_custom_target(
 
 include_directories(
   src/base
+  external/msgpack-3.0.1/include
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${GFLAGS_INCLUDE_DIRS}
   ${LIBFUSE_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
+  ${ZMQ_INCLUDE_DIRS}
   )
 
 add_library(
@@ -89,6 +91,8 @@ add_library(
   src/base/RawSocketUtils.cpp
   src/base/FileUtils.cpp
   src/base/FuseAdapter.cpp
+  src/base/BiDirectionalRpc.cpp
+  
   ${CODEFS_SRCS}
 )
 add_dependencies(
@@ -107,6 +111,7 @@ target_link_libraries (
   codefs
   LINK_PUBLIC
   codefs-lib
+  ${ZMQ_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   ${PROTOBUF_LIBRARIES}
   ${GFLAGS_LIBRARIES}
@@ -129,6 +134,7 @@ target_link_libraries (
   codefsserver
   LINK_PUBLIC
   codefs-lib
+  ${ZMQ_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   ${PROTOBUF_LIBRARIES}
   ${GFLAGS_LIBRARIES}

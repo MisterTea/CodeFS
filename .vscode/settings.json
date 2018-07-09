@@ -34,6 +34,8 @@
         "__bit_reference": "cpp",
         "__string": "cpp",
         "ios": "cpp",
-        "thread": "cpp"
+        "thread": "cpp",
+        "*.ipp": "cpp",
+        "functional": "cpp"
     }
 }
