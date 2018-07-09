@@ -10,29 +10,14 @@ class RpcTest : public testing::Test {
   virtual void SetUp() { srand(1); }
 };
 
-class ReflectionHandler : public BiDirectionalRpc::Handler {
- public:
-  ReflectionHandler(bool _flaky) : flaky(_flaky) {}
-  virtual pair<bool, string> request(const string& payload) {
-    if (flaky && rand() % 2 != 0) {
-      // 50% drop rate
-      return make_pair(false, "");
-    }
-    return make_pair(true, payload + payload);
-  }
-
- protected:
-  bool flaky;
-};
-
-void runServer(const string& address, bool bind, bool flaky) {
+void runServer(const string& address, bool bind, bool flaky, bool barrier) {
   {
-    ReflectionHandler handler(flaky);
-    BiDirectionalRpc server(&handler, address, bind);
+    BiDirectionalRpc server(address, bind);
+    server.setFlaky(flaky);
     sleep(3);
 
     vector<string> payloads = {"Hello", "World", "How", "Are", "You", "Today"};
-    vector<sole::uuid> uids;
+    vector<RpcId> uids;
 
     for (int a = 0; a < 500; a++) {
       server.update();
@@ -41,13 +26,21 @@ void runServer(const string& address, bool bind, bool flaky) {
         server.heartbeat();
       }
       if (a < payloads.size()) {
+        if (barrier && a % 2 == 0) {
+          server.barrier();
+        }
         uids.push_back(server.request(payloads[a]));
+      }
+      while (server.hasIncomingRequest()) {
+        auto idPayload = server.consumeIncomingRequest();
+        server.reply(idPayload.id, idPayload.payload + idPayload.payload);
       }
     }
 
     for (int a = 0; a < payloads.size(); a++) {
-      EXPECT_EQ(server.hasReply(uids[a]), true);
-      EXPECT_EQ(server.getReply(uids[a]), payloads[a] + payloads[a]);
+      EXPECT_EQ(server.hasIncomingReply(uids[a]), true);
+      EXPECT_EQ(server.consumeIncomingReply(uids[a]),
+                payloads[a] + payloads[a]);
     }
 
     server.shutdown();
@@ -62,9 +55,9 @@ TEST_F(RpcTest, ReadWrite) {
   string dirName = mkdtemp(dirSchema);
   string address = string("ipc://") + dirName + "/ipc";
 
-  thread serverThread(runServer, address, true, false);
+  thread serverThread(runServer, address, true, false, false);
   sleep(1);
-  thread clientThread(runServer, address, false, false);
+  thread clientThread(runServer, address, false, false, false);
   serverThread.join();
   clientThread.join();
 
@@ -76,9 +69,23 @@ TEST_F(RpcTest, FlakyReadWrite) {
   string dirName = mkdtemp(dirSchema);
   string address = string("ipc://") + dirName + "/ipc";
 
-  thread serverThread(runServer, address, true, true);
+  thread serverThread(runServer, address, true, true, false);
   sleep(1);
-  thread clientThread(runServer, address, false, true);
+  thread clientThread(runServer, address, false, true, false);
+  serverThread.join();
+  clientThread.join();
+
+  boost::filesystem::remove_all(dirName);
+}
+
+TEST_F(RpcTest, FlakyReadWriteBarrier) {
+  char dirSchema[] = "/tmp/TestRpc.XXXXXX";
+  string dirName = mkdtemp(dirSchema);
+  string address = string("ipc://") + dirName + "/ipc";
+
+  thread serverThread(runServer, address, true, true, true);
+  sleep(1);
+  thread clientThread(runServer, address, false, true, true);
   serverThread.join();
   clientThread.join();
 

@@ -40,6 +40,22 @@
         "fstream": "cpp",
         "locale": "cpp",
         "future": "cpp",
-        "forward_list": "cpp"
+        "forward_list": "cpp",
+        "__config": "cpp",
+        "__nullptr": "cpp",
+        "cstddef": "cpp",
+        "exception": "cpp",
+        "type_traits": "cpp",
+        "typeinfo": "cpp",
+        "algorithm": "cpp",
+        "cfenv": "cpp",
+        "tuple": "cpp",
+        "__functional_base": "cpp",
+        "atomic": "cpp",
+        "chrono": "cpp",
+        "optional": "cpp",
+        "limits": "cpp",
+        "ratio": "cpp",
+        "system_error": "cpp"
     }
 }
