@@ -4,12 +4,14 @@
 
 namespace codefs {
 ServerFileSystem::ServerFileSystem(const string &_absoluteFuseRoot)
-    : FileSystem(_absoluteFuseRoot) {}
+    : FileSystem(_absoluteFuseRoot), initialized(false) {}
 
-  void ServerFileSystem::rescan(const string &absolutePath) {
-    pathsToRescan.insert(absolutePath);
+void ServerFileSystem::init() {
+  Scanner::scanRecursively(this, fuseToAbsolute("/"), &allFileData);
+  initialized = true;
+}
 
-    // TODO: FUSE requires this to happen very fast, so hack it in for now, but we will buffer it later
-    Scanner::scanNode(this, absolutePath, &allFileData);
-  }
+void ServerFileSystem::rescan(const string &absolutePath) {
+  Scanner::scanNode(this, absolutePath, &allFileData);
+}
 }  // namespace codefs

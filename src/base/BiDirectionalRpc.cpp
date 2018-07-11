@@ -1,12 +1,12 @@
 #include "BiDirectionalRpc.hpp"
 
 namespace codefs {
-BiDirectionalRpc::BiDirectionalRpc(const string& address, bool bind)
-    : onBarrier(0), onId(0), flaky(false) {
+BiDirectionalRpc::BiDirectionalRpc(const string& _address, bool _bind)
+    : address(_address), bind(_bind), onBarrier(0), onId(0), flaky(false) {
   dist = std::uniform_int_distribution<uint64_t>(0, UINT64_MAX);
   context = shared_ptr<zmq::context_t>(new zmq::context_t(4));
-  socket = shared_ptr<zmq::socket_t>(
-      new zmq::socket_t(*(context.get()), ZMQ_DEALER));
+  socket =
+      shared_ptr<zmq::socket_t>(new zmq::socket_t(*(context.get()), ZMQ_PAIR));
   socket->setsockopt(ZMQ_LINGER, 3000);
   if (bind) {
     LOG(INFO) << "Binding on address: " << address;
@@ -154,7 +154,8 @@ void BiDirectionalRpc::update() {
 RpcId BiDirectionalRpc::request(const string& payload) {
   auto uuid = RpcId(onBarrier, onId++);
   auto idPayload = IdPayload(uuid, payload);
-  if (outgoingRequests.empty() || outgoingRequests.front().id.barrier == onBarrier) {
+  if (outgoingRequests.empty() ||
+      outgoingRequests.front().id.barrier == onBarrier) {
     // We can send the request immediately
     outgoingRequests.push_back(idPayload);
     sendRequest(outgoingRequests.back());
@@ -170,6 +171,21 @@ void BiDirectionalRpc::reply(const RpcId& rpcId, const string& payload) {
   sendReply(outgoingReplies.back());
 }
 
+void BiDirectionalRpc::reconnect() {
+  shutdown();
+
+  context = shared_ptr<zmq::context_t>(new zmq::context_t(4));
+  socket =
+      shared_ptr<zmq::socket_t>(new zmq::socket_t(*(context.get()), ZMQ_PAIR));
+  socket->setsockopt(ZMQ_LINGER, 3000);
+  if (bind) {
+    LOG(INFO) << "Binding on address: " << address;
+    socket->bind(address);
+  } else {
+    socket->connect(address);
+  }
+}
+
 void BiDirectionalRpc::tryToSendBarrier() {
   if (delayedRequests.empty()) {
     // Nothing to send
@@ -181,7 +197,9 @@ void BiDirectionalRpc::tryToSendBarrier() {
     delayedRequests.pop_front();
     sendRequest(outgoingRequests.back());
 
-    while (!delayedRequests.empty() && delayedRequests.front().id.barrier == outgoingRequests.front().id.barrier) {
+    while (!delayedRequests.empty() &&
+           delayedRequests.front().id.barrier ==
+               outgoingRequests.front().id.barrier) {
       // Part of the same barrier, keep sending
       outgoingRequests.push_back(delayedRequests.front());
       delayedRequests.pop_front();

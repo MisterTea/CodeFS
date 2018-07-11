@@ -86,8 +86,6 @@ add_library(
   src/base/easylogging++.cc
   src/base/LogHandler.cpp
   src/base/DaemonCreator.cpp
-  src/base/SocketHandler.cpp
-  src/base/UnixSocketHandler.cpp
   src/base/RawSocketUtils.cpp
   src/base/FileUtils.cpp
   src/base/FuseAdapter.cpp
@@ -105,6 +103,7 @@ add_executable (
 
   src/client/Client.cpp
   src/client/Main.cpp
+  src/client/ClientFuseAdapter.cpp
   )
 
 target_link_libraries (

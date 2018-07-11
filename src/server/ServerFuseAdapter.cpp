@@ -6,7 +6,14 @@
 namespace codefs {
 shared_ptr<ServerFileSystem> serverFileSystem;
 
+void blockUntilInitialized() {
+  while(!serverFileSystem->isInitialized()) {
+    sleep(1);
+  }
+}
+
 static int codefs_mkdir(const char *path, mode_t mode) {
+  blockUntilInitialized();
   int res;
 
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
@@ -19,6 +26,7 @@ static int codefs_mkdir(const char *path, mode_t mode) {
 }
 
 static int codefs_unlink(const char *path) {
+  blockUntilInitialized();
   int res;
 
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
@@ -30,6 +38,7 @@ static int codefs_unlink(const char *path) {
 }
 
 static int codefs_rmdir(const char *path) {
+  blockUntilInitialized();
   int res;
 
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
@@ -41,6 +50,7 @@ static int codefs_rmdir(const char *path) {
 }
 
 static int codefs_symlink(const char *from, const char *to) {
+  blockUntilInitialized();
   int res;
 
   string absoluteFrom = serverFileSystem->fuseToAbsolute(from);
@@ -54,6 +64,7 @@ static int codefs_symlink(const char *from, const char *to) {
 }
 
 static int codefs_rename(const char *from, const char *to) {
+  blockUntilInitialized();
   int res;
 
   string absoluteFrom = serverFileSystem->fuseToAbsolute(from);
@@ -67,6 +78,7 @@ static int codefs_rename(const char *from, const char *to) {
 }
 
 static int codefs_link(const char *from, const char *to) {
+  blockUntilInitialized();
   int res;
 
   string absoluteFrom = serverFileSystem->fuseToAbsolute(from);
@@ -80,6 +92,7 @@ static int codefs_link(const char *from, const char *to) {
 }
 
 static int codefs_chmod(const char *path, mode_t mode) {
+  blockUntilInitialized();
   int res;
 
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
@@ -91,6 +104,7 @@ static int codefs_chmod(const char *path, mode_t mode) {
 }
 
 static int codefs_chown(const char *path, uid_t uid, gid_t gid) {
+  blockUntilInitialized();
   int res;
 
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
@@ -102,6 +116,7 @@ static int codefs_chown(const char *path, uid_t uid, gid_t gid) {
 }
 
 static int codefs_truncate(const char *path, off_t size) {
+  blockUntilInitialized();
   int res;
 
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
@@ -114,6 +129,7 @@ static int codefs_truncate(const char *path, off_t size) {
 
 static int codefs_ftruncate(const char *path, off_t size,
                               struct fuse_file_info *fi) {
+  blockUntilInitialized();
   int res;
   LOG(FATAL) << "Not implemented yet";
 
@@ -127,6 +143,7 @@ static int codefs_ftruncate(const char *path, off_t size,
 
 static int codefs_create(const char *path, mode_t mode,
                            struct fuse_file_info *fi) {
+  blockUntilInitialized();
   int fd;
 
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
@@ -141,6 +158,7 @@ static int codefs_create(const char *path, mode_t mode,
 }
 
 static int codefs_open(const char *path, struct fuse_file_info *fi) {
+  blockUntilInitialized();
   int fd;
 
   int modes = 0;
@@ -176,6 +194,7 @@ static int codefs_open(const char *path, struct fuse_file_info *fi) {
 
 static int codefs_read(const char *path, char *buf, size_t size, off_t offset,
                          struct fuse_file_info *fi) {
+  blockUntilInitialized();
   int res;
 
   (void)path;
@@ -187,6 +206,7 @@ static int codefs_read(const char *path, char *buf, size_t size, off_t offset,
 
 static int codefs_write(const char *path, const char *buf, size_t size,
                           off_t offset, struct fuse_file_info *fi) {
+  blockUntilInitialized();
   int res;
 
   (void)path;
@@ -197,15 +217,18 @@ static int codefs_write(const char *path, const char *buf, size_t size,
 }
 
 static int codefs_statfs(const char *path, struct statvfs *stbuf) {
+  blockUntilInitialized();
   int res;
 
-  res = statvfs(path, stbuf);
+  string absolutePath = serverFileSystem->fuseToAbsolute(path);
+  res = statvfs(absolutePath.c_str(), stbuf);
   if (res == -1) return -errno;
 
   return 0;
 }
 
 static int codefs_release(const char *path, struct fuse_file_info *fi) {
+  blockUntilInitialized();
   LOG(INFO) << "RELEASING FD " << fi->fh;
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
   auto it = serverFileSystem->fdMap.find((int64_t)(fi->fh));
@@ -221,6 +244,7 @@ static int codefs_release(const char *path, struct fuse_file_info *fi) {
 
 static int codefs_fsync(const char *path, int isdatasync,
                           struct fuse_file_info *fi) {
+  blockUntilInitialized();
   int res;
   (void)path;
 
@@ -239,6 +263,7 @@ static int codefs_fsync(const char *path, int isdatasync,
 }
 
 static int codefs_utimens(const char *path, const struct timespec ts[2]) {
+  blockUntilInitialized();
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
   int res;
 
@@ -251,6 +276,7 @@ static int codefs_utimens(const char *path, const struct timespec ts[2]) {
 }
 
 static int codefs_removexattr(const char *path, const char *name) {
+  blockUntilInitialized();
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
   int res = lremovexattr(absolutePath.c_str(), name);
   if (res == -1) return -errno;
@@ -261,6 +287,7 @@ static int codefs_removexattr(const char *path, const char *name) {
 static int codefs_setxattr(const char *path, const char *name,
                              const char *value, size_t size, int flags,
                              uint32_t position) {
+  blockUntilInitialized();
   if (position) {
     LOG(FATAL) << "Got a non-zero position: " << position;
   }
@@ -271,24 +298,6 @@ static int codefs_setxattr(const char *path, const char *name,
   return 0;
 }
 
-#if 0
-static const struct fuse_opt codefs_opts[] = {
-    // { "case_insensitive", offsetof(struct loopback, case_insensitive), 1 },
-    FUSE_OPT_END};
-
-int main_unused(int argc, char *argv[]) {
-  struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
-
-  if (fuse_opt_parse(&args, NULL, codefs_opts, NULL) == -1) {
-    exit(1);
-  }
-
-  umask(0);
-  fuse_operations codefs_oper;
-  memset(&codefs_oper, 0, sizeof(fuse_operations));
-  }
-  #endif
-  
 void ServerFuseAdapter::assignServerCallbacks(shared_ptr<ServerFileSystem> _fileSystem, fuse_operations* ops)  {
   assignCallbacks(_fileSystem, ops);
   if (serverFileSystem.get()) {
@@ -316,13 +325,5 @@ void ServerFuseAdapter::assignServerCallbacks(shared_ptr<ServerFileSystem> _file
   ops->setxattr = codefs_setxattr;
   ops->removexattr = codefs_removexattr;
 }
-
-#if 0
-int aaa(int argc, char *argv[]) {
-  int res = fuse_main(argc, argv, &codefs_oper, NULL);
-  fuse_opt_free_args(&args);
-  return res;
-}
-#endif
 
 }  // namespace codefs

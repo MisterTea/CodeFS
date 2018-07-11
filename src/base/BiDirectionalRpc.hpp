@@ -66,10 +66,20 @@ class BiDirectionalRpc {
     return idPayload;
   }
 
-  bool hasIncomingReply(const RpcId& rpcId) {
+  bool hasIncomingReply() { return !incomingReplies.empty(); }
+  IdPayload consumeIncomingReply() {
+    if (incomingReplies.empty()) {
+      LOG(FATAL) << "Tried to get reply when there was none";
+    }
+    IdPayload idPayload = IdPayload(incomingReplies.begin()->first, incomingReplies.begin()->second);
+    incomingReplies.erase(incomingReplies.begin());
+    return idPayload;
+  }
+
+  bool hasIncomingReplyWithId(const RpcId& rpcId) {
     return incomingReplies.find(rpcId) != incomingReplies.end();
   }
-  string consumeIncomingReply(const RpcId& rpcId) {
+  string consumeIncomingReplyWithId(const RpcId& rpcId) {
     auto it = incomingReplies.find(rpcId);
     if (it == incomingReplies.end()) {
       LOG(FATAL) << "Tried to get a reply that didn't exist!";
@@ -80,6 +90,8 @@ class BiDirectionalRpc {
   }
 
   void setFlaky(bool _flaky) { flaky = _flaky; }
+
+  void reconnect();
 
  protected:
   deque<IdPayload> delayedRequests;
@@ -95,6 +107,9 @@ class BiDirectionalRpc {
   std::random_device rd;
   std::uniform_int_distribution<uint64_t> dist;
 
+  string address;
+  bool bind;
+  
   uint64_t onBarrier;
   uint64_t onId;
   bool flaky;

@@ -3,24 +3,31 @@
 
 #include "Headers.hpp"
 
+#include "BiDirectionalRpc.hpp"
+#include "MessageReader.hpp"
+#include "MessageWriter.hpp"
 #include "Scanner.hpp"
 #include "ServerFileSystem.hpp"
-#include "SocketHandler.hpp"
 
 namespace codefs {
-class Server {
+class Server : public ServerFileSystem::Handler {
  public:
-  Server(shared_ptr<SocketHandler> _socketHandler, int _port,
-         shared_ptr<ServerFileSystem> _fileSystem);
+  Server(const string &address, shared_ptr<ServerFileSystem> _fileSystem);
   void init();
   int update();
+  virtual void metadataUpdated(const string &path,
+                               const FileData &fileData);
 
  protected:
-  shared_ptr<SocketHandler> socketHandler;
+  string address;
+  shared_ptr<BiDirectionalRpc> rpc;
   int port;
   shared_ptr<ServerFileSystem> fileSystem;
   int clientFd;
   Scanner scanner;
+  MessageReader reader;
+  MessageWriter writer;
+  mutex rpcMutex;
 };
 }  // namespace codefs
 

@@ -6,8 +6,19 @@
 namespace codefs {
 class ServerFileSystem : public FileSystem {
  public:
+  class Handler {
+   public:
+    virtual void metadataUpdated(const string &path,
+                                 const FileData &fileData) = 0;
+  };
+
   explicit ServerFileSystem(const string &_absoluteFuseRoot);
   virtual ~ServerFileSystem() {}
+
+  void init();
+  inline bool isInitialized() { return initialized; }
+  void setHandler(Handler *_handler) { handler = _handler; }
+
   void rescan(const string &absolutePath);
   inline void rescanPathAndParent(const string &absolutePath) {
     rescan(absolutePath);
@@ -15,7 +26,8 @@ class ServerFileSystem : public FileSystem {
   }
 
  protected:
-  unordered_set<string> pathsToRescan;
+  bool initialized;
+  Handler *handler;
 };
 }  // namespace codefs
 

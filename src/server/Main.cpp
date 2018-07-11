@@ -4,10 +4,10 @@
 #include "Scanner.hpp"
 #include "ServerFileSystem.hpp"
 #include "ServerFuseAdapter.hpp"
-#include "UnixSocketHandler.hpp"
 
 DEFINE_int32(port, 2298, "Port to listen on");
 DEFINE_string(path, "", "Absolute path containing code for codefs to monitor");
+DEFINE_string(mountpoint, "/tmp/mount", "Where to mount the FS for server access");
 
 namespace codefs {
 struct loopback {};
@@ -20,7 +20,7 @@ static const struct fuse_opt codefs_opts[] = {
 
 void runFuse(char *binaryLocation, shared_ptr<ServerFileSystem> fileSystem) {
   int argc = 4;
-  const char *const_argv[] = {binaryLocation, "/tmp/mount", "-d", "-s"};
+  const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-d", "-s"};
   char **argv = (char **)const_argv;
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
@@ -64,18 +64,17 @@ int main(int argc, char *argv[]) {
     LOG(FATAL) << "Please specify a --path flag containing the code path";
   }
 
-  shared_ptr<SocketHandler> socketHandler(new UnixSocketHandler());
   shared_ptr<ServerFileSystem> fileSystem(new ServerFileSystem(FLAGS_path));
-  Server server(socketHandler, FLAGS_port, fileSystem);
-  // Sleep for 100ms for fuse to wake up
-  usleep(100 * 1000);
-  server.init();
+  shared_ptr<Server> server(new Server(string("tcp://") + "0.0.0.0" + ":" + to_string(FLAGS_port), fileSystem));
+  fileSystem->setHandler(server.get());
+  server->init();
 
-  // There is a chicken-and-egg issue where FUSE needs metadata and scanner shuold run before Fuse.  will fix later.
   shared_ptr<thread> fuseThread(new thread(runFuse, argv[0], fileSystem));
 
+  fileSystem->init();
+
   while (true) {
-    int retval = server.update();
+    int retval = server->update();
     if (retval) {
       return retval;
     }
