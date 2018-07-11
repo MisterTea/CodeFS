@@ -5,7 +5,7 @@
 
 namespace codefs {
 Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
-    : address(_address), fileSystem(_fileSystem) {
+    : address(_address), fileSystem(_fileSystem), fdCounter(1) {
   rpc = shared_ptr<BiDirectionalRpc>(new BiDirectionalRpc(address, false));
   writer.start();
   writer.writePrimitive<unsigned char>(CLIENT_SERVER_INIT);
@@ -42,6 +42,8 @@ int Client::update() {
       case SERVER_CLIENT_METADATA_UPDATE: {
         string path = reader.readPrimitive<string>();
         FileData fileData = reader.readProto<FileData>();
+        ownedFileContents.erase(path);
+        fileSystem->setNode(fileData);
         writer.start();
         writer.writePrimitive(header);
         rpc->reply(id, writer.finish());
@@ -51,22 +53,76 @@ int Client::update() {
     }
   }
 
-  while (rpc->hasIncomingReply()) {
-    auto idPayload = rpc->consumeIncomingReply();
-    // auto id = idPayload.id;
-    string payload = idPayload.payload;
-    reader.load(payload);
-    unsigned char header = reader.readPrimitive<unsigned char>();
+  return 0;
+}
 
-    switch (header) {
-      case SERVER_CLIENT_METADATA_UPDATE: {
-      } break;
-
-      default:
-        LOG(FATAL) << "Invalid packet header: " << int(header);
-    }
+int Client::open(const string& path, int flags, mode_t mode) {
+  if (flags & O_CREAT) {
+    LOG(FATAL) << "O_CREAT NOT SUPPORTED YET";
   }
-
+  string payload;
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    writer.start();
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_REQUEST_FILE);
+    writer.writePrimitive<string>(path);
+    writer.writePrimitive<int>(flags);
+    payload = writer.finish();
+  }
+  string result = fileRpc(payload);
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    reader.load(result);
+    int rpcErrno = reader.readPrimitive<int>();
+    if (rpcErrno) {
+      errno = rpcErrno;
+      return -1;
+    }
+    ownedFileContents.erase(path);
+    ownedFileContents.emplace(path, reader.readPrimitive<string>());
+    return fdCounter++;
+  }
+}
+int Client::close(const string& path) {
+  string payload;
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    writer.start();
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_RETURN_FILE);
+    writer.writePrimitive<string>(path);
+    writer.writePrimitive<string>(ownedFileContents[path]);
+    ownedFileContents.erase(path);
+    payload = writer.finish();
+  }
+  string result = fileRpc(payload);
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    reader.load(result);
+    int rpcErrno = reader.readPrimitive<int>();
+    if (rpcErrno) {
+      errno = rpcErrno;
+      return -1;
+    }
+    return 0;
+  }
+}
+int Client::pread(const string& path, char* buf, int size, int offset) {
+  auto it = ownedFileContents.find(path);
+  if (it == ownedFileContents.end()) {
+    LOG(FATAL) << "TRIED TO READ AN INVALID PATH";
+  }
+  memcpy(buf, it->second.c_str() + offset, size);
+  return 0;
+}
+int Client::pwrite(const string& path, const char* buf, int size, int offset) {
+  auto it = ownedFileContents.find(path);
+  if (it == ownedFileContents.end()) {
+    LOG(FATAL) << "TRIED TO READ AN INVALID PATH";
+  }
+  if (it->second.size() < offset+size) {
+    it->second.resize(offset+size, '\0');
+  }
+  memcpy(&(it->second[offset]), buf, size);
   return 0;
 }
 
@@ -92,7 +148,183 @@ int Client::link(const string& from, const string& to) {
   return twoPathsNoReturn(CLIENT_SERVER_LINK, from, to);
 }
 
-int Client::twoPathsNoReturn(unsigned char header, const string& from, const string& to) {
+int Client::chmod(const string& path, int mode) {
+  string payload;
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    writer.start();
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_CHMOD);
+    writer.writePrimitive<string>(path);
+    writer.writePrimitive<int>(mode);
+    payload = writer.finish();
+  }
+  string result = fileRpc(payload);
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    reader.load(result);
+    int res = reader.readPrimitive<int>();
+    int rpcErrno = reader.readPrimitive<int>();
+    if (res) {
+      errno = rpcErrno;
+    }
+    return res;
+  }
+}
+int Client::lchown(const string& path, int64_t uid, int64_t gid) {
+  string payload;
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    writer.start();
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_LCHOWN);
+    writer.writePrimitive<string>(path);
+    writer.writePrimitive<int64_t>(uid);
+    writer.writePrimitive<int64_t>(gid);
+    payload = writer.finish();
+  }
+  string result = fileRpc(payload);
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    reader.load(result);
+    int res = reader.readPrimitive<int>();
+    int rpcErrno = reader.readPrimitive<int>();
+    if (res) {
+      errno = rpcErrno;
+    }
+    return res;
+  }
+}
+int Client::truncate(const string& path, int64_t size) {
+  string payload;
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    writer.start();
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_LCHOWN);
+    writer.writePrimitive<string>(path);
+    writer.writePrimitive<int64_t>(size);
+    payload = writer.finish();
+  }
+  string result = fileRpc(payload);
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    reader.load(result);
+    int res = reader.readPrimitive<int>();
+    int rpcErrno = reader.readPrimitive<int>();
+    if (res) {
+      errno = rpcErrno;
+    }
+    return res;
+  }
+}
+int Client::statvfs(struct statvfs* stbuf) {
+  string payload;
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    writer.start();
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_STATVFS);
+    payload = writer.finish();
+  }
+  string result = fileRpc(payload);
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    reader.load(result);
+    int res = reader.readPrimitive<int>();
+    int rpcErrno = reader.readPrimitive<int>();
+    StatVfsData statVfsProto = reader.readProto<StatVfsData>();
+    if (res) {
+      errno = rpcErrno;
+      return res;
+    }
+    stbuf->f_bsize = statVfsProto.bsize();
+    stbuf->f_frsize = statVfsProto.frsize();
+    stbuf->f_blocks = statVfsProto.blocks();
+    stbuf->f_bfree = statVfsProto.bfree();
+    stbuf->f_bavail = statVfsProto.bavail();
+    stbuf->f_files = statVfsProto.files();
+    stbuf->f_ffree = statVfsProto.ffree();
+    stbuf->f_favail = statVfsProto.favail();
+    stbuf->f_fsid = statVfsProto.fsid();
+    stbuf->f_flag = statVfsProto.flag();
+    stbuf->f_namemax = statVfsProto.namemax();
+    return 0;
+  }
+}
+
+int Client::utimensat(const string& path, const struct timespec ts[2]) {
+  string payload;
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    writer.start();
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_UTIMENSAT);
+    writer.writePrimitive<string>(path);
+    writer.writePrimitive<int64_t>(ts[0].tv_sec);
+    writer.writePrimitive<int64_t>(ts[0].tv_nsec);
+    writer.writePrimitive<int64_t>(ts[1].tv_sec);
+    writer.writePrimitive<int64_t>(ts[1].tv_nsec);
+    payload = writer.finish();
+  }
+  string result = fileRpc(payload);
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    reader.load(result);
+    int res = reader.readPrimitive<int>();
+    int rpcErrno = reader.readPrimitive<int>();
+    if (res) {
+      errno = rpcErrno;
+    }
+    return res;
+  }
+}
+int Client::lremovexattr(const string& path, const string& name) {
+  string payload;
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    writer.start();
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_LREMOVEXATTR);
+    writer.writePrimitive<string>(path);
+    writer.writePrimitive<string>(name);
+    payload = writer.finish();
+  }
+  string result = fileRpc(payload);
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    reader.load(result);
+    int res = reader.readPrimitive<int>();
+    int rpcErrno = reader.readPrimitive<int>();
+    if (res) {
+      errno = rpcErrno;
+    }
+    return res;
+  }
+}
+int Client::lsetxattr(const string& path, const string& name,
+                      const string& value, int64_t size, int flags) {
+  string payload;
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    writer.start();
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_LSETXATTR);
+    writer.writePrimitive<string>(path);
+    writer.writePrimitive<string>(name);
+    writer.writePrimitive<string>(value);
+    writer.writePrimitive<int64_t>(size);
+    writer.writePrimitive<int>(flags);
+    payload = writer.finish();
+  }
+  string result = fileRpc(payload);
+  {
+    lock_guard<mutex> lock(rpcMutex);
+    reader.load(result);
+    int res = reader.readPrimitive<int>();
+    int rpcErrno = reader.readPrimitive<int>();
+    if (res) {
+      errno = rpcErrno;
+    }
+    return res;
+  }
+}
+
+int Client::twoPathsNoReturn(unsigned char header, const string& from,
+                             const string& to) {
   string payload;
   {
     lock_guard<mutex> lock(rpcMutex);

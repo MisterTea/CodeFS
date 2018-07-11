@@ -65,8 +65,3 @@ message FileData {
   repeated bytes xattr_value = 8;
   repeated string child_node = 9;
 }
-
-message FilePathAndContents {
-  optional string path = 1;
-  optional bytes contents = 2;
-}

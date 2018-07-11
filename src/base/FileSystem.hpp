@@ -42,6 +42,11 @@ class FileSystem {
     return &(it->second);
   }
 
+  void setNode(const FileData& fileData) {
+    allFileData.erase(fileData.path());
+    allFileData.emplace(fileData.path(), fileData);
+  }
+
   virtual string absoluteToFuse(const string &absolutePath) {
     if (absolutePath.find(absoluteFuseRoot) != 0) {
       LOG(FATAL) << "Tried to convert absolute path to fuse that wasn't inside "

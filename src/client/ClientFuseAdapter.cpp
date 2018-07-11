@@ -70,7 +70,7 @@ static int codefs_ftruncate(const char *path, off_t size,
 
 static int codefs_create(const char *path, mode_t mode,
                          struct fuse_file_info *fi) {
-  int fd = client->open(absolutePath.c_str(), fi->flags, mode);
+  int fd = client->open(path, fi->flags, mode);
   if (fd == -1) return -errno;
   fi->fh = fd;
   LOG(INFO) << "CREATING FD " << fi->fh;
@@ -115,7 +115,7 @@ static int codefs_read(const char *path, char *buf, size_t size, off_t offset,
   int res;
 
   (void)path;
-  res = client->pread(fi->fh, buf, size, offset);
+  res = client->pread(path, buf, size, offset);
   if (res == -1) res = -errno;
 
   return res;
@@ -126,7 +126,7 @@ static int codefs_write(const char *path, const char *buf, size_t size,
   int res;
 
   (void)path;
-  res = client->pwrite(fi->fh, buf, size, offset);
+  res = client->pwrite(path, buf, size, offset);
   if (res == -1) res = -errno;
 
   return res;
@@ -135,7 +135,7 @@ static int codefs_write(const char *path, const char *buf, size_t size,
 static int codefs_statfs(const char *path, struct statvfs *stbuf) {
   int res;
 
-  res = client->statvfs(path, stbuf);
+  res = client->statvfs(stbuf);
   if (res == -1) return -errno;
 
   return 0;

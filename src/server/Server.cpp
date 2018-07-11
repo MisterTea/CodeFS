@@ -23,19 +23,63 @@ int Server::update() {
     unsigned char header = reader.readPrimitive<unsigned char>();
     switch (header) {
       case CLIENT_SERVER_REQUEST_FILE: {
-        string path = RawSocketUtils::readMessage(clientFd);
-        string contents = "";
-        // fpc.set_contents(fileSystem->read(path));
+        string path = reader.readPrimitive<string>();
+        int flags = reader.readPrimitive<int>();
+        int readWriteMode = (flags & O_ACCMODE);
+        const FileData *fileData = fileSystem->getNode(path);
+
         writer.start();
         writer.writePrimitive(header);
-        writer.writePrimitive(path);
-        writer.writePrimitive(contents);
+
+        bool access = true;
+        if (readWriteMode == O_RDONLY) {
+          if (fileData == NULL) {
+            writer.writePrimitive<int>(ENOENT);
+            writer.writePrimitive<string>("");
+            access = false;
+          } else if (!fileData->can_read()) {
+            writer.writePrimitive<int>(EACCES);
+            writer.writePrimitive<string>("");
+            access = false;
+          }
+        } else {
+          if (fileData == NULL) {
+            // Get the parent path and make sure we can write there
+            string parentPath =
+                boost::filesystem::path(path).parent_path().string();
+            const FileData *parentFileData = fileSystem->getNode(parentPath);
+            if (parentFileData == NULL || !parentFileData->can_execute()) {
+              writer.writePrimitive<int>(EACCES);
+              writer.writePrimitive<string>("");
+              access = false;
+            }
+          } else if (!fileData->can_write()) {
+            writer.writePrimitive<int>(EACCES);
+            writer.writePrimitive<string>("");
+            access = false;
+          }
+        }
+
+        if (access) {
+          bool skipLoadingFile =
+              (readWriteMode == O_WRONLY && !(flags & O_APPEND));
+          string fileContents = "";
+          if (!skipLoadingFile) {
+            fileContents = fileSystem->readFile(path);
+          }
+
+          clientLockedPaths.insert(path);
+          writer.writePrimitive<int>(0);
+          writer.writePrimitive<string>(fileContents);
+        }
         rpc->reply(id, writer.finish());
       } break;
       case CLIENT_SERVER_RETURN_FILE: {
-        FilePathAndContents fpc =
-            RawSocketUtils::readProto<FilePathAndContents>(clientFd);
-        // fileSystem->write(fpc.path(), fpc.contents());
+        string path = reader.readPrimitive<string>();
+        string fileContents = reader.readPrimitive<string>();
+
+        fileSystem->writeFile(path, fileContents);
+
         writer.start();
         writer.writePrimitive(header);
         rpc->reply(id, writer.finish());
@@ -55,7 +99,7 @@ int Server::update() {
 
   while (rpc->hasIncomingReply()) {
     auto idPayload = rpc->consumeIncomingReply();
-    //auto id = idPayload.id;
+    // auto id = idPayload.id;
     string payload = idPayload.payload;
     reader.load(payload);
     unsigned char header = reader.readPrimitive<unsigned char>();

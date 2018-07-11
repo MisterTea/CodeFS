@@ -8,10 +8,10 @@
 #include <sys/xattr.h>
 
 #if __APPLE__
-#include <sys/ucred.h>
-#include <util.h>
 #include <sys/attr.h>
+#include <sys/ucred.h>
 #include <sys/vnode.h>
+#include <util.h>
 #elif __FreeBSD__
 #include <libutil.h>
 #elif __NetBSD__  // do not need pty.h on NetBSD
@@ -78,10 +78,10 @@ extern "C" {
 
 #include "base64.hpp"
 #include "json.hpp"
+#include "msgpack.hpp"
 #include "sole.hpp"
 #include "zmq.hpp"
 #include "zmq_addon.hpp"
-#include "msgpack.hpp"
 
 #include "CodeFS.pb.h"
 
@@ -101,11 +101,11 @@ using json = nlohmann::json;
 static const int PROTOCOL_VERSION = 1;
 
 #define FATAL_IF_FALSE(X) \
-  if (((X) == false))    \
+  if (((X) == false))     \
     LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno);
 
-#define FATAL_IF_FALSE_NOT_EAGAIN(X) \
-  if (((X) == false) && errno != EAGAIN)    \
+#define FATAL_IF_FALSE_NOT_EAGAIN(X)     \
+  if (((X) == false) && errno != EAGAIN) \
     LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno);
 
 #define FATAL_FAIL(X) \
@@ -138,6 +138,13 @@ inline std::string SystemToStr(const char* cmd) {
       result += buffer.data();
   }
   return result;
+}
+
+inline std::string fileToStr(const string& path) {
+  std::ifstream t(path);
+  std::stringstream buffer;
+  buffer << t.rdbuf();
+  return buffer.str();
 }
 
 inline bool replace(std::string& str, const std::string& from,

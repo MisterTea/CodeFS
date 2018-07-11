@@ -28,6 +28,7 @@ class Server : public ServerFileSystem::Handler {
   MessageReader reader;
   MessageWriter writer;
   mutex rpcMutex;
+  unordered_set<string> clientLockedPaths;
 };
 }  // namespace codefs
 

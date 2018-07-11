@@ -25,6 +25,9 @@ class ServerFileSystem : public FileSystem {
     rescan(boost::filesystem::path(absolutePath).parent_path().string());
   }
 
+  string readFile(const string& path);
+  void writeFile(const string& path, const string& fileContents);
+
  protected:
   bool initialized;
   Handler *handler;
