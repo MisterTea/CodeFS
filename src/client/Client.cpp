@@ -100,6 +100,7 @@ int Client::twoPathsNoReturn(unsigned char header, const string& from, const str
     writer.writePrimitive<unsigned char>(header);
     writer.writePrimitive<string>(from);
     writer.writePrimitive<string>(to);
+    payload = writer.finish();
   }
   string result = fileRpc(payload);
   {
@@ -121,6 +122,7 @@ int Client::singlePathNoReturn(unsigned char header, const string& path) {
     writer.start();
     writer.writePrimitive<unsigned char>(header);
     writer.writePrimitive<string>(path);
+    payload = writer.finish();
   }
   string result = fileRpc(payload);
   {
