@@ -25,7 +25,9 @@ class MessageWriter {
   }
 
   inline string finish() {
-    return string(buffer.data(), buffer.size());
+    string s(buffer.data(), buffer.size());
+    start();
+    return s;
   }
 
  protected:

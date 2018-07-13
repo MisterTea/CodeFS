@@ -15,10 +15,21 @@ class Server : public ServerFileSystem::Handler {
   Server(const string &address, shared_ptr<ServerFileSystem> _fileSystem);
   void init();
   int update();
+  inline void heartbeat() { rpc->heartbeat(); }
+
   virtual void metadataUpdated(const string &path,
                                const FileData &fileData);
 
  protected:
+  RpcId request(const string& payload) {
+    lock_guard<mutex> lock(rpcMutex);
+    return rpc->request(payload);
+  }
+  void reply(const RpcId& rpcId, const string& payload) {
+    lock_guard<mutex> lock(rpcMutex);
+    rpc->reply(rpcId, payload);
+  }
+
   string address;
   shared_ptr<BiDirectionalRpc> rpc;
   int port;
@@ -29,6 +40,8 @@ class Server : public ServerFileSystem::Handler {
   MessageWriter writer;
   mutex rpcMutex;
   unordered_set<string> clientLockedPaths;
+
+
 };
 }  // namespace codefs
 

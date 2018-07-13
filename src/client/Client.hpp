@@ -10,6 +10,7 @@ class Client {
  public:
   Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem);
   int update();
+  inline void heartbeat() { rpc->heartbeat(); }
 
   int open(const string& path, int flags, mode_t mode);
   int open(const string& path, int flags) {

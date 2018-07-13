@@ -67,7 +67,9 @@ void BiDirectionalRpc::update() {
     // Pretend we never got the message
     return;
   }
-  LOG(INFO) << "GOT PACKET WITH HEADER " << header;
+  if (header != HEARTBEAT) {
+    LOG(INFO) << "GOT PACKET WITH HEADER " << header;
+  }
   switch (header) {
     case HEARTBEAT: {
       // TODO: Update keepalive time
@@ -220,6 +222,8 @@ void BiDirectionalRpc::sendRequest(const IdPayload& idPayload) {
 }
 
 void BiDirectionalRpc::sendReply(const IdPayload& idPayload) {
+  LOG(INFO) << "SENDING REPLY: " << idPayload.id.str() << " "
+            << idPayload.payload;
   zmq::message_t message(1 + sizeof(RpcId) + idPayload.payload.length());
   message.data<char>()[0] = REPLY;
   memcpy(message.data<char>() + 1, &(idPayload.id), sizeof(RpcId));

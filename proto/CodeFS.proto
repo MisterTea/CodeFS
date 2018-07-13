@@ -64,4 +64,5 @@ message FileData {
   repeated string xattr_key = 7;
   repeated bytes xattr_value = 8;
   repeated string child_node = 9;
+  optional bool deleted = 10;
 }

@@ -40,14 +40,15 @@ FileData Scanner::scanNode(FileSystem* fileSystem, const string& path,
   LOG(INFO) << "SCANNING NODE : " << path;
 
   FileData fd;
+  fd.set_path(fileSystem->absoluteToFuse(path));
+  fd.set_deleted(false);
 
   if (access(path.c_str(), F_OK) != 0) {
     // The file is gone
     result->erase(fileSystem->absoluteToFuse(path));
+    fd.set_deleted(true);
     return fd;
   }
-
-  fd.set_path(fileSystem->absoluteToFuse(path));
 
   if (access(path.c_str(), R_OK) == 0) {
     fd.set_can_read(true);

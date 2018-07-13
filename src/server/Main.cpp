@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
   // Setup easylogging configurations
   el::Configurations defaultConf =
       codefs::LogHandler::SetupLogHandler(&argc, &argv);
-  defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "false");
+  defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "true");
   el::Loggers::setVerboseLevel(3);
   // default max log file size is 20MB for etserver
   string maxlogsize = "20971520";
@@ -64,19 +64,24 @@ int main(int argc, char *argv[]) {
     LOG(FATAL) << "Please specify a --path flag containing the code path";
   }
 
-  shared_ptr<ServerFileSystem> fileSystem(new ServerFileSystem(FLAGS_path));
+  shared_ptr<ServerFileSystem> fileSystem(new ServerFileSystem(FLAGS_path, FLAGS_mountpoint));
   shared_ptr<Server> server(new Server(string("tcp://") + "0.0.0.0" + ":" + to_string(FLAGS_port), fileSystem));
   fileSystem->setHandler(server.get());
   server->init();
+  sleep(1);
 
   shared_ptr<thread> fuseThread(new thread(runFuse, argv[0], fileSystem));
 
   fileSystem->init();
 
+  int counter=0;
   while (true) {
     int retval = server->update();
     if (retval) {
       return retval;
+    }
+    if (++counter % 100 == 0) {
+      server->heartbeat();
     }
     usleep(1000);
   }

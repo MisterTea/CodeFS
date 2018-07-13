@@ -13,6 +13,8 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
 
   while (true) {
     LOG(INFO) << "Waiting for init...";
+    rpc->update();
+    rpc->heartbeat();
     if (rpc->hasIncomingReplyWithId(initId)) {
       string payload = rpc->consumeIncomingReplyWithId(initId);
       reader.load(payload);
@@ -23,6 +25,7 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
         allFileData.push_back(reader.readProto<FileData>());
       }
       fileSystem->init(allFileData);
+      break;
     }
     sleep(1);
   }
@@ -58,7 +61,7 @@ int Client::update() {
 
 int Client::open(const string& path, int flags, mode_t mode) {
   if (flags & O_CREAT) {
-    LOG(FATAL) << "O_CREAT NOT SUPPORTED YET";
+    LOG(ERROR) << "O_CREAT NOT SUPPORTED YET";
   }
   string payload;
   {
@@ -98,8 +101,9 @@ int Client::close(const string& path) {
   {
     lock_guard<mutex> lock(rpcMutex);
     reader.load(result);
+    int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
-    if (rpcErrno) {
+    if (res) {
       errno = rpcErrno;
       return -1;
     }
@@ -198,7 +202,7 @@ int Client::truncate(const string& path, int64_t size) {
   {
     lock_guard<mutex> lock(rpcMutex);
     writer.start();
-    writer.writePrimitive<unsigned char>(CLIENT_SERVER_LCHOWN);
+    writer.writePrimitive<unsigned char>(CLIENT_SERVER_TRUNCATE);
     writer.writePrimitive<string>(path);
     writer.writePrimitive<int64_t>(size);
     payload = writer.finish();
@@ -224,10 +228,13 @@ int Client::statvfs(struct statvfs* stbuf) {
     payload = writer.finish();
   }
   string result = fileRpc(payload);
+  LOG(INFO) << "GOT RESULT " << result;
   {
     lock_guard<mutex> lock(rpcMutex);
     reader.load(result);
+    LOG(INFO) << "READING RES";
     int res = reader.readPrimitive<int>();
+    LOG(INFO) << "READING ERRNO";
     int rpcErrno = reader.readPrimitive<int>();
     StatVfsData statVfsProto = reader.readProto<StatVfsData>();
     if (res) {
@@ -372,7 +379,7 @@ int Client::singlePathNoReturn(unsigned char header, const string& path) {
 string Client::fileRpc(const string& payload) {
   auto id = rpc->request(payload);
   while (true) {
-    sleep(1);
+    usleep(100);
     lock_guard<mutex> lock(rpcMutex);
     if (rpc->hasIncomingReplyWithId(id)) {
       return rpc->consumeIncomingReplyWithId(id);

@@ -30,6 +30,7 @@ static int codefs_unlink(const char *path) {
   int res;
 
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
+  LOG(INFO) << "UNLINKING: " << absolutePath;
   res = unlink(absolutePath.c_str());
   if (res == -1) return -errno;
 
@@ -229,8 +230,8 @@ static int codefs_statfs(const char *path, struct statvfs *stbuf) {
 
 static int codefs_release(const char *path, struct fuse_file_info *fi) {
   blockUntilInitialized();
-  LOG(INFO) << "RELEASING FD " << fi->fh;
   string absolutePath = serverFileSystem->fuseToAbsolute(path);
+  LOG(INFO) << "RELEASING PATH: " << absolutePath << " FD: " << fi->fh;
   auto it = serverFileSystem->fdMap.find((int64_t)(fi->fh));
   if (it == serverFileSystem->fdMap.end()) {
     LOG(FATAL) << "Tried to close an fd that doesn't exist";

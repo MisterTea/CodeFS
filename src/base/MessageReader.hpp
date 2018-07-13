@@ -9,6 +9,7 @@ class MessageReader {
   MessageReader() {}
 
   inline void load(const string& s) {
+    unpackHandler.remove_nonparsed_buffer();
     unpackHandler.reserve_buffer(s.size());
     memcpy(unpackHandler.buffer(), s.c_str(), s.length());
     unpackHandler.buffer_consumed(s.length());

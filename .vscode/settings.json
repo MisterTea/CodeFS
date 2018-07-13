@@ -57,6 +57,7 @@
         "limits": "cpp",
         "ratio": "cpp",
         "system_error": "cpp",
-        "mutex": "cpp"
+        "mutex": "cpp",
+        "__mutex_base": "cpp"
     }
 }

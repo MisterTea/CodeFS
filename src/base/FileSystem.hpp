@@ -44,7 +44,11 @@ class FileSystem {
 
   void setNode(const FileData& fileData) {
     allFileData.erase(fileData.path());
-    allFileData.emplace(fileData.path(), fileData);
+    if (fileData.deleted()) {
+      // The node is deleted, Don't add
+    } else {
+      allFileData.emplace(fileData.path(), fileData);
+    }
   }
 
   virtual string absoluteToFuse(const string &absolutePath) {
@@ -61,7 +65,7 @@ class FileSystem {
     }
   }
   virtual string fuseToAbsolute(const string &fusePath) {
-    return absoluteFuseRoot + fusePath;
+    return (boost::filesystem::path(absoluteFuseRoot) / fusePath).string();
   }
 
   inline bool hasDirectory(const string &path) {

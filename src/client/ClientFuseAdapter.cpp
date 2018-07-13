@@ -9,6 +9,9 @@ shared_ptr<ClientFileSystem> clientFileSystem;
 shared_ptr<Client> client;
 
 static int codefs_mkdir(const char *path, mode_t mode) {
+  if (mode) {
+    LOG(FATAL) << "MKDIR WITH MODE NOT SUPPORTED YET";
+  }
   int res = client->mkdir(path);
   if (res == -1) return -errno;
   return 0;
@@ -135,7 +138,9 @@ static int codefs_write(const char *path, const char *buf, size_t size,
 static int codefs_statfs(const char *path, struct statvfs *stbuf) {
   int res;
 
+  LOG(INFO) << "BEGIN CLIENT STATFS";
   res = client->statvfs(stbuf);
+  LOG(INFO) << "END CLIENT STATFS";
   if (res == -1) return -errno;
 
   return 0;
