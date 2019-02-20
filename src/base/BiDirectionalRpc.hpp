@@ -114,6 +114,7 @@ class BiDirectionalRpc {
   uint64_t onId;
   bool flaky;
 
+  void resendRandomOutgoingMessage();
   void tryToSendBarrier();
   void sendRequest(const IdPayload& idPayload);
   void sendReply(const IdPayload& idPayload);

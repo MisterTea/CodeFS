@@ -88,6 +88,10 @@ extern "C" {
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 
+#define HAVE_CXX_MUTEX (1)
+#include "libfswatch/c++/monitor.hpp"
+#include "libfswatch/c++/monitor_factory.hpp"
+
 using namespace std;
 
 namespace google {}

@@ -113,7 +113,7 @@ static int codefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     d->offset = offset;
   }
   while (1) {
-    auto node = fileSystem->getNodeOrFatal(d->directory);
+    auto node = fileSystem->getNode(d->directory);
     LOG(INFO) << "NUM CHILDREN: " << node->child_node_size();
     if (node->child_node_size() <= d->offset) {
       break;
@@ -125,7 +125,7 @@ static int codefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     struct stat st;
     memset(&st, 0, sizeof(struct stat));
-    auto childNode = fileSystem->getNodeOrFatal(filePath);
+    auto childNode = fileSystem->getNode(filePath);
     FileSystem::protoToStat(childNode->stat_data(), &st);
     if (filler(buf, fileName.c_str(), &st, d->offset + 1)) break;
 

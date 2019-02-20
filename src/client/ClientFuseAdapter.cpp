@@ -1,18 +1,15 @@
 #include "Headers.hpp"
 
+#include "Client.hpp"
 #include "ClientFileSystem.hpp"
 #include "ClientFuseAdapter.hpp"
-#include "Client.hpp"
 
 namespace codefs {
 shared_ptr<ClientFileSystem> clientFileSystem;
 shared_ptr<Client> client;
 
 static int codefs_mkdir(const char *path, mode_t mode) {
-  if (mode) {
-    LOG(FATAL) << "MKDIR WITH MODE NOT SUPPORTED YET";
-  }
-  int res = client->mkdir(path);
+  int res = client->mkdir(path, mode);
   if (res == -1) return -errno;
   return 0;
 }
@@ -67,8 +64,7 @@ static int codefs_truncate(const char *path, off_t size) {
 
 static int codefs_ftruncate(const char *path, off_t size,
                             struct fuse_file_info *fi) {
-  LOG(FATAL) << "Not implemented yet";
-  return 0;
+  return codefs_truncate(path, size);
 }
 
 static int codefs_create(const char *path, mode_t mode,
@@ -107,7 +103,7 @@ static int codefs_open(const char *path, struct fuse_file_info *fi) {
   if (fd == -1) return -errno;
 
   fi->fh = fd;
-  LOG(INFO) << "OPENING FD " << fi->fh;
+  LOG(INFO) << "OPENING FD " << fi->fh << " WITH MODE " << readWriteMode;
   clientFileSystem->fdMap.insert(
       make_pair((int64_t)fd, FileSystem::FdInfo(string(path))));
   return 0;

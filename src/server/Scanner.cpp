@@ -40,12 +40,13 @@ FileData Scanner::scanNode(FileSystem* fileSystem, const string& path,
   LOG(INFO) << "SCANNING NODE : " << path;
 
   FileData fd;
-  fd.set_path(fileSystem->absoluteToFuse(path));
+  fd.set_path(fileSystem->absoluteToRelative(path));
   fd.set_deleted(false);
+  fd.set_invalid(false);
 
   if (access(path.c_str(), F_OK) != 0) {
     // The file is gone
-    result->erase(fileSystem->absoluteToFuse(path));
+    result->erase(fileSystem->absoluteToRelative(path));
     fd.set_deleted(true);
     return fd;
   }
@@ -114,7 +115,7 @@ FileData Scanner::scanNode(FileSystem* fileSystem, const string& path,
     }
   }
 
-  (*result)[fileSystem->absoluteToFuse(path)] = fd;
+  (*result)[fileSystem->absoluteToRelative(path)] = fd;
   return fd;
 }
 }  // namespace codefs

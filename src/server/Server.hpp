@@ -12,21 +12,23 @@
 namespace codefs {
 class Server : public ServerFileSystem::Handler {
  public:
-  Server(const string &address, shared_ptr<ServerFileSystem> _fileSystem);
+  Server(const string& address, shared_ptr<ServerFileSystem> _fileSystem);
+
+  virtual ~Server() {}
+
   void init();
   int update();
   inline void heartbeat() { rpc->heartbeat(); }
 
-  virtual void metadataUpdated(const string &path,
-                               const FileData &fileData);
+  virtual void metadataUpdated(const string& path, const FileData& fileData);
 
  protected:
   RpcId request(const string& payload) {
-    lock_guard<mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(rpcMutex);
     return rpc->request(payload);
   }
   void reply(const RpcId& rpcId, const string& payload) {
-    lock_guard<mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(rpcMutex);
     rpc->reply(rpcId, payload);
   }
 
@@ -38,10 +40,8 @@ class Server : public ServerFileSystem::Handler {
   Scanner scanner;
   MessageReader reader;
   MessageWriter writer;
-  mutex rpcMutex;
+  recursive_mutex rpcMutex;
   unordered_set<string> clientLockedPaths;
-
-
 };
 }  // namespace codefs
 

@@ -13,14 +13,12 @@ class Client {
   inline void heartbeat() { rpc->heartbeat(); }
 
   int open(const string& path, int flags, mode_t mode);
-  int open(const string& path, int flags) {
-    return open(path, flags, 0);
-  }
+  int open(const string& path, int flags) { return open(path, flags, 0); }
   int close(const string& path);
   int pread(const string& path, char* buf, int size, int offset);
   int pwrite(const string& path, const char* buf, int size, int offset);
 
-  int mkdir(const string& path);
+  int mkdir(const string& path, mode_t mode);
   int unlink(const string& path);
   int rmdir(const string& path);
 
@@ -45,7 +43,7 @@ class Client {
   unordered_map<string, string> ownedFileContents;
   MessageReader reader;
   MessageWriter writer;
-  mutex rpcMutex;
+  recursive_mutex rpcMutex;
   int fdCounter;
   int twoPathsNoReturn(unsigned char header, const string& from,
                        const string& to);

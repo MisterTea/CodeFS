@@ -6,8 +6,8 @@
 namespace codefs {
 class ClientFileSystem : public FileSystem {
  public:
-  explicit ClientFileSystem(const string& _absoluteFuseRoot)
-      : FileSystem(_absoluteFuseRoot) {}
+  explicit ClientFileSystem(const string& _rootPath)
+      : FileSystem(_rootPath) {}
   virtual ~ClientFileSystem() {}
   void init(const vector<FileData>& initialData) {
     for (const FileData& fd : initialData) {

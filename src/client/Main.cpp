@@ -78,7 +78,7 @@ int main(int argc, char *argv[]) {
     if (retval) {
       return retval;
     }
-    if (++counter % 100 == 0) {
+    if (++counter % 3000 == 0) {
       client->heartbeat();
     }
     usleep(1000);

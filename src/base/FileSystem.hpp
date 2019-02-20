@@ -22,27 +22,29 @@ class FileSystem {
     FdInfo(const string &_path) : path(_path) {}
   };
 
-  explicit FileSystem(const string &_absoluteFuseRoot)
-      : absoluteFuseRoot(_absoluteFuseRoot) {
-    boost::trim_right_if(absoluteFuseRoot, boost::is_any_of("/"));
+  explicit FileSystem(const string &_rootPath) : rootPath(_rootPath) {
+    boost::trim_right_if(rootPath, boost::is_any_of("/"));
   }
 
   virtual const FileData *getNode(const string &path) {
-    auto it = allFileData.find(path);
-    if (it == allFileData.end()) {
-      return NULL;
+    while (true) {
+      {
+        std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+        auto it = allFileData.find(path);
+        if (it == allFileData.end()) {
+          return NULL;
+        }
+        bool invalid = it->second.invalid();
+        if (!invalid) {
+          return &(it->second);
+        }
+      }
+      usleep(1);
     }
-    return &(it->second);
-  }
-  virtual const FileData *getNodeOrFatal(const string &path) {
-    auto it = allFileData.find(path);
-    if (it == allFileData.end()) {
-      LOG(FATAL) << "Called getNode on a path that doesn't exist: " << path;
-    }
-    return &(it->second);
   }
 
-  void setNode(const FileData& fileData) {
+  void setNode(const FileData &fileData) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     allFileData.erase(fileData.path());
     if (fileData.deleted()) {
       // The node is deleted, Don't add
@@ -51,26 +53,45 @@ class FileSystem {
     }
   }
 
-  virtual string absoluteToFuse(const string &absolutePath) {
-    if (absolutePath.find(absoluteFuseRoot) != 0) {
+  virtual string absoluteToRelative(const string &absolutePath) {
+    if (absolutePath.find(rootPath) != 0) {
       LOG(FATAL) << "Tried to convert absolute path to fuse that wasn't inside "
-                    "the fuse FS: "
-                 << absolutePath << " " << absoluteFuseRoot;
+                    "the absolute FS: "
+                 << absolutePath << " " << rootPath;
     }
-    string relative = absolutePath.substr(absoluteFuseRoot.size());
+    string relative = absolutePath.substr(rootPath.size());
     if (relative.length() == 0) {
       return "/";
     } else {
       return relative;
     }
   }
-  virtual string fuseToAbsolute(const string &fusePath) {
-    return (boost::filesystem::path(absoluteFuseRoot) / fusePath).string();
+  virtual string relativeToAbsolute(const string &relativePath) {
+    return (boost::filesystem::path(rootPath) / relativePath).string();
   }
 
   inline bool hasDirectory(const string &path) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     return allFileData.find(path) != allFileData.end() &&
            S_ISDIR(allFileData.find(path)->second.stat_data().mode());
+  }
+
+  inline void invalidatePath(const string &path) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    auto it = allFileData.find(path);
+    if (it == allFileData.end()) {
+      // Create empty invalid node
+      FileData fd;
+      fd.set_invalid(true);
+      allFileData[path] = fd;
+      return;
+    }
+    it->second.set_invalid(true);
+  }
+
+  inline void invalidateParentAndPath(const string &path) {
+    invalidatePath(boost::filesystem::path(path).parent_path().string());
+    invalidatePath(path);
   }
 
   static inline void statToProto(const struct stat &fileStat, StatData *fStat) {
@@ -110,8 +131,9 @@ class FileSystem {
   unordered_map<string, FileData> allFileData;
 
  protected:
-  string absoluteFuseRoot;
+  string rootPath;
   shared_ptr<thread> fuseThread;
+  std::recursive_mutex fileDataMutex;
 };
 }  // namespace codefs
 

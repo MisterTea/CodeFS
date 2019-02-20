@@ -35,6 +35,16 @@ void BiDirectionalRpc::shutdown() {
 }
 
 void BiDirectionalRpc::heartbeat() {
+  if (!outgoingReplies.empty() || !outgoingRequests.empty()) {
+    resendRandomOutgoingMessage();
+  } else {
+    zmq::message_t message(1);
+    message.data<char>()[0] = HEARTBEAT;
+    FATAL_IF_FALSE_NOT_EAGAIN(socket->send(message, ZMQ_NOBLOCK));
+  }
+}
+
+void BiDirectionalRpc::resendRandomOutgoingMessage() {
   if (!outgoingReplies.empty() &&
       (outgoingRequests.empty() || rand() % 2 == 0)) {
     // Re-send a random reply
@@ -47,9 +57,6 @@ void BiDirectionalRpc::heartbeat() {
     std::advance(it, rand() % outgoingRequests.size());
     sendRequest(*it);
   } else {
-    zmq::message_t message(1);
-    message.data<char>()[0] = HEARTBEAT;
-    FATAL_IF_FALSE_NOT_EAGAIN(socket->send(message, ZMQ_NOBLOCK));
   }
 }
 
@@ -211,8 +218,7 @@ void BiDirectionalRpc::tryToSendBarrier() {
 }
 
 void BiDirectionalRpc::sendRequest(const IdPayload& idPayload) {
-  LOG(INFO) << "SENDING REQUEST: " << idPayload.id.str() << " "
-            << idPayload.payload;
+  LOG(INFO) << "SENDING REQUEST: " << idPayload.id.str();
   zmq::message_t message(1 + sizeof(RpcId) + idPayload.payload.length());
   message.data<char>()[0] = REQUEST;
   memcpy(message.data<char>() + 1, &(idPayload.id), sizeof(RpcId));
@@ -222,8 +228,7 @@ void BiDirectionalRpc::sendRequest(const IdPayload& idPayload) {
 }
 
 void BiDirectionalRpc::sendReply(const IdPayload& idPayload) {
-  LOG(INFO) << "SENDING REPLY: " << idPayload.id.str() << " "
-            << idPayload.payload;
+  LOG(INFO) << "SENDING REPLY: " << idPayload.id.str();
   zmq::message_t message(1 + sizeof(RpcId) + idPayload.payload.length());
   message.data<char>()[0] = REPLY;
   memcpy(message.data<char>() + 1, &(idPayload.id), sizeof(RpcId));

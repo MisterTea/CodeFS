@@ -12,7 +12,7 @@ class ServerFileSystem : public FileSystem {
                                  const FileData &fileData) = 0;
   };
 
-  explicit ServerFileSystem(const string &_absoluteFuseRoot, const string& _fuseMountPoint);
+  explicit ServerFileSystem(const string &_rootPath);
   virtual ~ServerFileSystem() {}
 
   void init();
@@ -25,15 +25,10 @@ class ServerFileSystem : public FileSystem {
     rescan(boost::filesystem::path(absolutePath).parent_path().string());
   }
 
-  string readFile(const string& path);
-  int writeFile(const string& path, const string& fileContents);
-
-  virtual string fuseToMount(const string &fusePath) {
-    return (boost::filesystem::path(fuseMountPoint) / fusePath).string();
-  }
+  string readFile(const string &path);
+  int writeFile(const string &path, const string &fileContents);
 
  protected:
-  string fuseMountPoint;
   bool initialized;
   Handler *handler;
 };

@@ -44,6 +44,8 @@ find_package(LibFUSE REQUIRED)
 find_package(ZeroMQ REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem)
+find_package(fswatch REQUIRED)
+find_package(OSXFuse REQUIRED)
 
 IF(FREEBSD)
   set(CORE_LIBRARIES util)
@@ -77,18 +79,32 @@ include_directories(
   ${LIBFUSE_INCLUDE_DIRS}
   ${Boost_INCLUDE_DIRS}
   ${ZMQ_INCLUDE_DIRS}
+  ${fswatch_INCLUDE_DIRS}
   )
 
 add_library(
   codefs-lib
   STATIC
 
+  src/base/easylogging++.h
   src/base/easylogging++.cc
+
+  src/base/LogHandler.hpp
   src/base/LogHandler.cpp
+
+  src/base/DaemonCreator.hpp
   src/base/DaemonCreator.cpp
+
+  src/base/RawSocketUtils.hpp
   src/base/RawSocketUtils.cpp
+
+  src/base/FileUtils.hpp
   src/base/FileUtils.cpp
+
+  src/base/FuseAdapter.hpp
   src/base/FuseAdapter.cpp
+
+  src/base/BiDirectionalRpc.hpp
   src/base/BiDirectionalRpc.cpp
   
   ${CODEFS_SRCS}
@@ -101,9 +117,13 @@ add_dependencies(
 add_executable (
   codefs
 
+  src/client/Client.hpp
   src/client/Client.cpp
-  src/client/Main.cpp
+
+  src/client/ClientFuseAdapter.hpp
   src/client/ClientFuseAdapter.cpp
+
+  src/client/Main.cpp
   )
 
 target_link_libraries (
@@ -114,9 +134,10 @@ target_link_libraries (
   ${CMAKE_THREAD_LIBS_INIT}
   ${PROTOBUF_LIBRARIES}
   ${GFLAGS_LIBRARIES}
-  ${LIBFUSE_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
+  ${OSXFUSE_LIBRARIES}
+  ${fswatch_LIBRARIES}
 )
 
 add_executable (
@@ -124,9 +145,10 @@ add_executable (
 
   src/server/ServerFileSystem.cpp
   src/server/Scanner.cpp
-  src/server/Main.cpp
   src/server/Server.cpp
-  src/server/ServerFuseAdapter.cpp
+  src/server/fswatchexample.cpp
+
+  src/server/Main.cpp
   )
 
 target_link_libraries (
@@ -137,9 +159,10 @@ target_link_libraries (
   ${CMAKE_THREAD_LIBS_INIT}
   ${PROTOBUF_LIBRARIES}
   ${GFLAGS_LIBRARIES}
-  ${LIBFUSE_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
+  ${OSXFUSE_LIBRARIES}
+  ${fswatch_LIBRARIES}
 )
 
 if(BUILD_TEST) # Build unit tests.

@@ -7,13 +7,13 @@ Server::Server(const string &_address, shared_ptr<ServerFileSystem> _fileSystem)
     : address(_address), fileSystem(_fileSystem), clientFd(-1) {}
 
 void Server::init() {
-  lock_guard<mutex> lock(rpcMutex);
+  lock_guard<std::recursive_mutex> lock(rpcMutex);
   rpc = shared_ptr<BiDirectionalRpc>(new BiDirectionalRpc(address, true));
 }
 
 int Server::update() {
   {
-    lock_guard<mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(rpcMutex);
     rpc->update();
   }
 
@@ -21,7 +21,7 @@ int Server::update() {
     RpcId id;
     string payload;
     {
-      lock_guard<mutex> lock(rpcMutex);
+      lock_guard<std::recursive_mutex> lock(rpcMutex);
       if (!rpc->hasIncomingRequest()) {
         break;
       }
@@ -88,6 +88,7 @@ int Server::update() {
           string fileContents = "";
           if (!skipLoadingFile) {
             fileContents = fileSystem->readFile(path);
+            LOG(INFO) << "READ FILE: " << path << " " << fileContents;
           }
 
           clientLockedPaths.insert(path);
@@ -124,7 +125,8 @@ int Server::update() {
       } break;
       case CLIENT_SERVER_MKDIR: {
         string path = reader.readPrimitive<string>();
-        int res = mkdir(fileSystem->fuseToMount(path).c_str(), 0);
+        mode_t mode = reader.readPrimitive<int>();
+        int res = ::mkdir(fileSystem->relativeToAbsolute(path).c_str(), mode);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -135,8 +137,9 @@ int Server::update() {
       } break;
       case CLIENT_SERVER_UNLINK: {
         string path = reader.readPrimitive<string>();
-        LOG(INFO) << "UNLINKING: " << path << " " << fileSystem->fuseToMount(path);
-        int res = unlink(fileSystem->fuseToMount(path).c_str());
+        LOG(INFO) << "UNLINKING: " << path << " "
+                  << fileSystem->relativeToAbsolute(path);
+        int res = ::unlink(fileSystem->relativeToAbsolute(path).c_str());
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -147,7 +150,7 @@ int Server::update() {
       } break;
       case CLIENT_SERVER_RMDIR: {
         string path = reader.readPrimitive<string>();
-        int res = rmdir(fileSystem->fuseToMount(path).c_str());
+        int res = ::rmdir(fileSystem->relativeToAbsolute(path).c_str());
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -159,8 +162,8 @@ int Server::update() {
       case CLIENT_SERVER_SYMLINK: {
         string from = reader.readPrimitive<string>();
         string to = reader.readPrimitive<string>();
-        int res = symlink(fileSystem->fuseToMount(from).c_str(),
-                          fileSystem->fuseToMount(to).c_str());
+        int res = ::symlink(fileSystem->relativeToAbsolute(from).c_str(),
+                            fileSystem->relativeToAbsolute(to).c_str());
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -172,8 +175,8 @@ int Server::update() {
       case CLIENT_SERVER_RENAME: {
         string from = reader.readPrimitive<string>();
         string to = reader.readPrimitive<string>();
-        int res = rename(fileSystem->fuseToMount(from).c_str(),
-                         fileSystem->fuseToMount(to).c_str());
+        int res = ::rename(fileSystem->relativeToAbsolute(from).c_str(),
+                           fileSystem->relativeToAbsolute(to).c_str());
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -185,8 +188,8 @@ int Server::update() {
       case CLIENT_SERVER_LINK: {
         string from = reader.readPrimitive<string>();
         string to = reader.readPrimitive<string>();
-        int res = link(fileSystem->fuseToMount(from).c_str(),
-                       fileSystem->fuseToMount(to).c_str());
+        int res = ::link(fileSystem->relativeToAbsolute(from).c_str(),
+                         fileSystem->relativeToAbsolute(to).c_str());
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -198,7 +201,7 @@ int Server::update() {
       case CLIENT_SERVER_CHMOD: {
         string path = reader.readPrimitive<string>();
         int mode = reader.readPrimitive<int>();
-        int res = chmod(fileSystem->fuseToMount(path).c_str(), mode);
+        int res = ::chmod(fileSystem->relativeToAbsolute(path).c_str(), mode);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -211,7 +214,8 @@ int Server::update() {
         string path = reader.readPrimitive<string>();
         int64_t uid = reader.readPrimitive<int64_t>();
         int64_t gid = reader.readPrimitive<int64_t>();
-        int res = lchown(fileSystem->fuseToMount(path).c_str(), uid, gid);
+        int res =
+            ::lchown(fileSystem->relativeToAbsolute(path).c_str(), uid, gid);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -223,7 +227,8 @@ int Server::update() {
       case CLIENT_SERVER_TRUNCATE: {
         string path = reader.readPrimitive<string>();
         int64_t size = reader.readPrimitive<int64_t>();
-        int res = truncate(fileSystem->fuseToMount(path).c_str(), size);
+        int res =
+            ::truncate(fileSystem->relativeToAbsolute(path).c_str(), size);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -235,7 +240,8 @@ int Server::update() {
       case CLIENT_SERVER_STATVFS: {
         LOG(INFO) << "STARTING STATVFS";
         struct statvfs stbuf;
-        int res = statvfs(fileSystem->fuseToMount("/").c_str(), &stbuf);
+        int res =
+            ::statvfs(fileSystem->relativeToAbsolute("/").c_str(), &stbuf);
         StatVfsData statVfsProto;
         writer.writePrimitive<int>(res);
         if (res) {
@@ -267,8 +273,8 @@ int Server::update() {
         ts[0].tv_nsec = reader.readPrimitive<int64_t>();
         ts[1].tv_sec = reader.readPrimitive<int64_t>();
         ts[1].tv_nsec = reader.readPrimitive<int64_t>();
-        int res = utimensat(0, fileSystem->fuseToMount(path).c_str(), ts,
-                            AT_SYMLINK_NOFOLLOW);
+        int res = ::utimensat(0, fileSystem->relativeToAbsolute(path).c_str(),
+                              ts, AT_SYMLINK_NOFOLLOW);
         if (res) {
           writer.writePrimitive<int>(errno);
         } else {
@@ -279,8 +285,8 @@ int Server::update() {
       case CLIENT_SERVER_LREMOVEXATTR: {
         string path = reader.readPrimitive<string>();
         string name = reader.readPrimitive<string>();
-        int res = lremovexattr(fileSystem->fuseToMount(path).c_str(),
-                               name.c_str());
+        int res = ::lremovexattr(fileSystem->relativeToAbsolute(path).c_str(),
+                                 name.c_str());
         if (res) {
           writer.writePrimitive<int>(errno);
         } else {
@@ -294,9 +300,9 @@ int Server::update() {
         string value = reader.readPrimitive<string>();
         int64_t size = reader.readPrimitive<int64_t>();
         int flags = reader.readPrimitive<int>();
-        string absolutePath = fileSystem->fuseToMount(path);
-        int res = lsetxattr(absolutePath.c_str(), name.c_str(), value.c_str(),
-                            size, flags);
+        string absolutePath = fileSystem->relativeToAbsolute(path);
+        int res = ::lsetxattr(absolutePath.c_str(), name.c_str(), value.c_str(),
+                              size, flags);
         if (res) {
           writer.writePrimitive<int>(errno);
         } else {
@@ -313,7 +319,7 @@ int Server::update() {
     RpcId id;
     string payload;
     {
-      lock_guard<mutex> lock(rpcMutex);
+      lock_guard<std::recursive_mutex> lock(rpcMutex);
       if (!rpc->hasIncomingReply()) {
         break;
       }
