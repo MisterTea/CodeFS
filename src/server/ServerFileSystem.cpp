@@ -11,7 +11,7 @@ void ServerFileSystem::init() {
   initialized = true;
 }
 
-void ServerFileSystem::rescan(const string& absolutePath) {
+void ServerFileSystem::rescanPath(const string& absolutePath) {
   std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
   FileData fileData = Scanner::scanNode(this, absolutePath, &allFileData);
   if (handler == NULL) {

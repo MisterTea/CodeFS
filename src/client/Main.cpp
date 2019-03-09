@@ -6,7 +6,8 @@
 
 DEFINE_string(hostname, "localhost", "Hostname to connect to");
 DEFINE_int32(port, 2298, "Port to connect to");
-DEFINE_string(mountpoint, "/tmp/clientmount", "Where to mount the FS for server access");
+DEFINE_string(mountpoint, "/tmp/clientmount",
+              "Where to mount the FS for server access");
 
 namespace codefs {
 struct loopback {};
@@ -17,9 +18,11 @@ static const struct fuse_opt codefs_opts[] = {
     // { "case_insensitive", offsetof(struct loopback, case_insensitive), 1 },
     FUSE_OPT_END};
 
-void runFuse(char *binaryLocation, shared_ptr<Client> client, shared_ptr<ClientFileSystem> fileSystem) {
+void runFuse(char *binaryLocation, shared_ptr<Client> client,
+             shared_ptr<ClientFileSystem> fileSystem) {
   int argc = 4;
-  const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-d", "-s"};
+  const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-d",
+                              "-s"};
   char **argv = (char **)const_argv;
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
@@ -66,13 +69,17 @@ int main(int argc, char *argv[]) {
     LOG(FATAL) << "Could not create temporary directory for codefs";
   }
 
-  shared_ptr<ClientFileSystem> fileSystem(new ClientFileSystem(string(dir_name)));
-  shared_ptr<Client> client(new Client(string("tcp://") + FLAGS_hostname + ":" + to_string(FLAGS_port), fileSystem));
+  shared_ptr<ClientFileSystem> fileSystem(
+      new ClientFileSystem(string(dir_name)));
+  shared_ptr<Client> client(new Client(
+      string("tcp://") + FLAGS_hostname + ":" + to_string(FLAGS_port),
+      fileSystem));
   sleep(1);
 
-  shared_ptr<thread> fuseThread(new thread(runFuse, argv[0], client, fileSystem));
+  shared_ptr<thread> fuseThread(
+      new thread(runFuse, argv[0], client, fileSystem));
 
-  int counter=0;
+  int counter = 0;
   while (true) {
     int retval = client->update();
     if (retval) {

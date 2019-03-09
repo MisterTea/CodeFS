@@ -24,19 +24,18 @@ void runFsWatch() {
         switch (it2) {
           case NoOp:
             break;
-          case PlatformSpecific:
-            break;
           case Updated:
           case Link:
           case OwnerModified:
           case AttributeModified:
-            globalFileSystem->rescan(it.get_path());
+            globalFileSystem->rescanPath(it.get_path());
             break;
           case Removed:
           case Renamed:
           case MovedFrom:
           case MovedTo:
           case Created:
+          case PlatformSpecific:
             globalFileSystem->rescanPathAndParent(it.get_path());
             break;
           case IsFile:

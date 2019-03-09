@@ -1,7 +1,7 @@
 cmake_minimum_required (VERSION 2.8.12)
 project (CodeFS)
 
-option(BUILD_TEST "Build all unit test" OFF)
+option(BUILD_TEST "Build all unit test" ON)
 option(CODE_COVERAGE "Enable code coverage" OFF)
 
 
@@ -107,6 +107,12 @@ add_library(
   src/base/BiDirectionalRpc.hpp
   src/base/BiDirectionalRpc.cpp
   
+  src/base/ZmqBiDirectionalRpc.hpp
+  src/base/ZmqBiDirectionalRpc.cpp
+
+  src/base/TimeHandler.hpp
+  src/base/TimeHandler.cpp
+
   ${CODEFS_SRCS}
 )
 add_dependencies(
@@ -168,7 +174,44 @@ target_link_libraries (
 if(BUILD_TEST) # Build unit tests.
   message(STATUS "Enabling test for ${PROJECT_NAME}")
   enable_testing()
-  add_subdirectory(test)
+
+  set(GTEST_PATH ${PROJECT_SOURCE_DIR}/test)
+
+  file(GLOB TEST_SRCS test/Test*.cpp )
+  add_executable(
+    codefs-test
+  
+    ${TEST_SRCS}
+    )
+  
+  add_dependencies(
+    codefs-test
+    codefs-lib
+    gtest
+    gtest_main
+    gmock
+    gmock_main)
+  
+  target_link_libraries(
+    codefs-test
+    codefs-lib
+    ${ZMQ_LIBRARIES}
+    ${CMAKE_THREAD_LIBS_INIT}
+    gtest
+    gtest_main
+    gmock
+    gmock_main
+    ${GFLAGS_LIBRARIES}
+    ${sodium_LIBRARY_RELEASE}
+    ${Boost_LIBRARIES}
+    resolv
+    util
+    )
+  add_test(
+    codefs-test
+    codefs-test
+    )
+  
 endif()
 
 install(TARGETS codefs codefsserver

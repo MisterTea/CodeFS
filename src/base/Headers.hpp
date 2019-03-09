@@ -108,13 +108,23 @@ static const int PROTOCOL_VERSION = 1;
   if (((X) == false))     \
     LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno);
 
-#define FATAL_IF_FALSE_NOT_EAGAIN(X)     \
-  if (((X) == false) && errno != EAGAIN) \
-    LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno);
+#define FATAL_IF_FALSE_NOT_EAGAIN(X)                                 \
+  if (((X) == false)) {                                              \
+    if (errno == EAGAIN) {                                           \
+      VLOG(10) << "Could not complete: (" << errno                   \
+               << "): " << strerror(errno);                          \
+    } else {                                                         \
+      LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno); \
+    }                                                                \
+  }
 
 #define FATAL_FAIL(X) \
   if (((X) == -1))    \
     LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno);
+
+#define DRAW_FROM_UNORDERED(ITERATOR, COLLECTION) \
+  auto ITERATOR = COLLECTION.begin();             \
+  std::advance(ITERATOR, rand() % COLLECTION.size());
 
 template <typename Out>
 inline void split(const std::string& s, char delim, Out result) {

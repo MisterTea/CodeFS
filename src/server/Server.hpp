@@ -3,11 +3,11 @@
 
 #include "Headers.hpp"
 
-#include "BiDirectionalRpc.hpp"
 #include "MessageReader.hpp"
 #include "MessageWriter.hpp"
 #include "Scanner.hpp"
 #include "ServerFileSystem.hpp"
+#include "ZmqBiDirectionalRpc.hpp"
 
 namespace codefs {
 class Server : public ServerFileSystem::Handler {
@@ -33,7 +33,7 @@ class Server : public ServerFileSystem::Handler {
   }
 
   string address;
-  shared_ptr<BiDirectionalRpc> rpc;
+  shared_ptr<ZmqBiDirectionalRpc> rpc;
   int port;
   shared_ptr<ServerFileSystem> fileSystem;
   int clientFd;

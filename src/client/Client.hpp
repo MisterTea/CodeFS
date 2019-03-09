@@ -1,9 +1,9 @@
 #include "Headers.hpp"
 
-#include "BiDirectionalRpc.hpp"
 #include "ClientFileSystem.hpp"
 #include "MessageReader.hpp"
 #include "MessageWriter.hpp"
+#include "ZmqBiDirectionalRpc.hpp"
 
 namespace codefs {
 class Client {
@@ -38,7 +38,7 @@ class Client {
 
  protected:
   string address;
-  shared_ptr<BiDirectionalRpc> rpc;
+  shared_ptr<ZmqBiDirectionalRpc> rpc;
   shared_ptr<ClientFileSystem> fileSystem;
   unordered_map<string, string> ownedFileContents;
   MessageReader reader;

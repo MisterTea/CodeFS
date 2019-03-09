@@ -1,6 +1,7 @@
 #include "Server.hpp"
 
 #include "RawSocketUtils.hpp"
+#include "ZmqBiDirectionalRpc.hpp"
 
 namespace codefs {
 Server::Server(const string &_address, shared_ptr<ServerFileSystem> _fileSystem)
@@ -8,7 +9,7 @@ Server::Server(const string &_address, shared_ptr<ServerFileSystem> _fileSystem)
 
 void Server::init() {
   lock_guard<std::recursive_mutex> lock(rpcMutex);
-  rpc = shared_ptr<BiDirectionalRpc>(new BiDirectionalRpc(address, true));
+  rpc = shared_ptr<ZmqBiDirectionalRpc>(new ZmqBiDirectionalRpc(address, true));
 }
 
 int Server::update() {
@@ -25,7 +26,7 @@ int Server::update() {
       if (!rpc->hasIncomingRequest()) {
         break;
       }
-      auto idPayload = rpc->consumeIncomingRequest();
+      auto idPayload = rpc->getFirstIncomingRequest();
       id = idPayload.id;
       payload = idPayload.payload;
     }
@@ -96,6 +97,7 @@ int Server::update() {
           writer.writePrimitive<string>(fileContents);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_RETURN_FILE: {
         string path = reader.readPrimitive<string>();
@@ -112,6 +114,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_INIT: {
         LOG(INFO) << "INITIALIZING";
@@ -134,6 +137,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_UNLINK: {
         string path = reader.readPrimitive<string>();
@@ -147,6 +151,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_RMDIR: {
         string path = reader.readPrimitive<string>();
@@ -158,6 +163,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_SYMLINK: {
         string from = reader.readPrimitive<string>();
@@ -171,6 +177,8 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(from));
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(to));
       } break;
       case CLIENT_SERVER_RENAME: {
         string from = reader.readPrimitive<string>();
@@ -184,6 +192,8 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(from));
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(to));
       } break;
       case CLIENT_SERVER_LINK: {
         string from = reader.readPrimitive<string>();
@@ -197,6 +207,8 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(from));
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(to));
       } break;
       case CLIENT_SERVER_CHMOD: {
         string path = reader.readPrimitive<string>();
@@ -209,6 +221,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_LCHOWN: {
         string path = reader.readPrimitive<string>();
@@ -223,6 +236,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_TRUNCATE: {
         string path = reader.readPrimitive<string>();
@@ -236,6 +250,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_STATVFS: {
         LOG(INFO) << "STARTING STATVFS";
@@ -275,6 +290,7 @@ int Server::update() {
         ts[1].tv_nsec = reader.readPrimitive<int64_t>();
         int res = ::utimensat(0, fileSystem->relativeToAbsolute(path).c_str(),
                               ts, AT_SYMLINK_NOFOLLOW);
+        writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
         } else {
@@ -293,6 +309,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_LSETXATTR: {
         string path = reader.readPrimitive<string>();
@@ -309,6 +326,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
       } break;
       default:
         LOG(FATAL) << "Invalid packet header: " << int(header);
@@ -323,7 +341,7 @@ int Server::update() {
       if (!rpc->hasIncomingReply()) {
         break;
       }
-      auto idPayload = rpc->consumeIncomingReply();
+      auto idPayload = rpc->getFirstIncomingReply();
       id = idPayload.id;
       payload = idPayload.payload;
     }

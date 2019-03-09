@@ -19,10 +19,10 @@ class ServerFileSystem : public FileSystem {
   inline bool isInitialized() { return initialized; }
   void setHandler(Handler *_handler) { handler = _handler; }
 
-  void rescan(const string &absolutePath);
+  void rescanPath(const string &absolutePath);
   inline void rescanPathAndParent(const string &absolutePath) {
-    rescan(absolutePath);
-    rescan(boost::filesystem::path(absolutePath).parent_path().string());
+    rescanPath(absolutePath);
+    rescanPath(boost::filesystem::path(absolutePath).parent_path().string());
   }
 
   string readFile(const string &path);

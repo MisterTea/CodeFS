@@ -13,6 +13,7 @@ static int codefs_getattr(const char *path, struct stat *stbuf) {
 
   const FileData *fileData = fileSystem->getNode(path);
   if (fileData == NULL) {
+    LOG(INFO) << "MISSING FILE NODE FOR " << path;
     return -1 * ENOENT;
   }
   FileSystem::protoToStat(fileData->stat_data(), stbuf);
@@ -24,6 +25,7 @@ static int codefs_fgetattr(const char *path, struct stat *stbuf,
   LOG(INFO) << "GETTING ATTR FOR FD " << fi->fh;
   auto it = fileSystem->fdMap.find(fi->fh);
   if (it == fileSystem->fdMap.end()) {
+    LOG(INFO) << "MISSING FD";
     errno = EBADF;
     return -errno;
   }

@@ -72,7 +72,7 @@ static int codefs_create(const char *path, mode_t mode,
   int fd = client->open(path, fi->flags, mode);
   if (fd == -1) return -errno;
   fi->fh = fd;
-  LOG(INFO) << "CREATING FD " << fi->fh;
+  LOG(INFO) << "CREATING FD " << fi->fh << " FOR PATH " << path;
   clientFileSystem->fdMap.insert(
       make_pair((int64_t)fd, FileSystem::FdInfo(string(path))));
   return 0;
@@ -179,6 +179,11 @@ static int codefs_setxattr(const char *path, const char *name,
   return 0;
 }
 
+static int codefs_lock(const char *path, struct fuse_file_info *fi, int cmd,
+                       struct flock *flockObj) {
+  return 0;
+}
+
 void ClientFuseAdapter::assignClientCallbacks(
     shared_ptr<ClientFileSystem> _fileSystem, shared_ptr<Client> _client,
     fuse_operations *ops) {
@@ -194,6 +199,7 @@ void ClientFuseAdapter::assignClientCallbacks(
   ops->rmdir = codefs_rmdir;
   ops->rename = codefs_rename;
   ops->link = codefs_link;
+  ops->lock = codefs_lock;
   ops->chmod = codefs_chmod;
   ops->chown = codefs_chown;
   ops->truncate = codefs_truncate;

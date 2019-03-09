@@ -39,7 +39,7 @@ class FileSystem {
           return &(it->second);
         }
       }
-      usleep(1);
+      usleep(1000);
     }
   }
 
@@ -74,24 +74,6 @@ class FileSystem {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     return allFileData.find(path) != allFileData.end() &&
            S_ISDIR(allFileData.find(path)->second.stat_data().mode());
-  }
-
-  inline void invalidatePath(const string &path) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    auto it = allFileData.find(path);
-    if (it == allFileData.end()) {
-      // Create empty invalid node
-      FileData fd;
-      fd.set_invalid(true);
-      allFileData[path] = fd;
-      return;
-    }
-    it->second.set_invalid(true);
-  }
-
-  inline void invalidateParentAndPath(const string &path) {
-    invalidatePath(boost::filesystem::path(path).parent_path().string());
-    invalidatePath(path);
   }
 
   static inline void statToProto(const struct stat &fileStat, StatData *fStat) {

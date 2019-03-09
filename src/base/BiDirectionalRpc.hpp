@@ -2,21 +2,11 @@
 #define __BIDIRECTIONAL_RPC_H__
 
 #include "Headers.hpp"
+#include "MessageReader.hpp"
+#include "MessageWriter.hpp"
+#include "RpcId.hpp"
 
 namespace codefs {
-class RpcId {
- public:
-  RpcId() : barrier(0), id(0) {}
-  RpcId(uint64_t _barrier, uint64_t _id) : barrier(_barrier), id(_id) {}
-  bool operator==(const RpcId& other) const {
-    return barrier == other.barrier && id == other.id;
-  }
-  string str() const { return to_string(barrier) + "/" + to_string(id); }
-
-  uint64_t barrier;
-  uint64_t id;
-};
-
 class IdPayload {
  public:
   IdPayload() {}
@@ -49,29 +39,36 @@ enum RpcHeader { HEARTBEAT = 1, REQUEST = 2, REPLY = 3, ACKNOWLEDGE = 4 };
 
 class BiDirectionalRpc {
  public:
-  BiDirectionalRpc(const string& address, bool bind);
-  ~BiDirectionalRpc();
+  BiDirectionalRpc();
+  virtual ~BiDirectionalRpc();
   void shutdown();
   void heartbeat();
-  void update();
   void barrier() { onBarrier++; }
 
   RpcId request(const string& payload);
-  void reply(const RpcId& rpcId, const string& payload);
+  void requestNoReply(const string& payload);
+  virtual void requestWithId(const IdPayload& idPayload);
+  virtual void reply(const RpcId& rpcId, const string& payload);
 
   bool hasIncomingRequest() { return !incomingRequests.empty(); }
-  IdPayload consumeIncomingRequest() {
-    IdPayload idPayload = incomingRequests.front();
-    incomingRequests.pop_front();
-    return idPayload;
+  bool hasIncomingRequestWithId(const RpcId& rpcId) {
+    return incomingRequests.find(rpcId) != incomingRequests.end();
+  }
+  IdPayload getFirstIncomingRequest() {
+    if (!hasIncomingRequest()) {
+      LOG(FATAL) << "Tried to get a request when one doesn't exist";
+    }
+    return IdPayload(incomingRequests.begin()->first,
+                     incomingRequests.begin()->second);
   }
 
   bool hasIncomingReply() { return !incomingReplies.empty(); }
-  IdPayload consumeIncomingReply() {
+  IdPayload getFirstIncomingReply() {
     if (incomingReplies.empty()) {
       LOG(FATAL) << "Tried to get reply when there was none";
     }
-    IdPayload idPayload = IdPayload(incomingReplies.begin()->first, incomingReplies.begin()->second);
+    IdPayload idPayload = IdPayload(incomingReplies.begin()->first,
+                                    incomingReplies.begin()->second);
     incomingReplies.erase(incomingReplies.begin());
     return idPayload;
   }
@@ -91,34 +88,52 @@ class BiDirectionalRpc {
 
   void setFlaky(bool _flaky) { flaky = _flaky; }
 
-  void reconnect();
+  virtual void receive(const string& message);
+
+  bool hasWork() {
+    LOG(INFO) << "CHECKING WORK: " << !delayedRequests.empty() << " "
+              << !outgoingRequests.empty() << " " << !incomingRequests.empty()
+              << " " << !outgoingReplies.empty() << " "
+              << !incomingReplies.empty();
+    return !delayedRequests.empty() || !outgoingRequests.empty() ||
+           !incomingRequests.empty() || !outgoingReplies.empty() ||
+           !incomingReplies.empty();
+  }
 
  protected:
   deque<IdPayload> delayedRequests;
   deque<IdPayload> outgoingRequests;
-  deque<IdPayload> incomingRequests;
+  unordered_map<RpcId, string> incomingRequests;
+  unordered_set<RpcId> oneWayRequests;
+  unordered_map<RpcId, int64_t> requestTime;
 
   deque<IdPayload> outgoingReplies;
   unordered_map<RpcId, string> incomingReplies;
 
-  shared_ptr<zmq::context_t> context;
-  shared_ptr<zmq::socket_t> socket;
+  MessageReader reader;
+  MessageWriter writer;
 
-  std::random_device rd;
-  std::uniform_int_distribution<uint64_t> dist;
+  deque<int> rpcTime;
 
-  string address;
-  bool bind;
-  
   uint64_t onBarrier;
   uint64_t onId;
   bool flaky;
 
+  void handleRequest(const RpcId& rpcId, const string& payload);
+  void handleReply(const RpcId& rpcId, const string& payload);
   void resendRandomOutgoingMessage();
   void tryToSendBarrier();
   void sendRequest(const IdPayload& idPayload);
   void sendReply(const IdPayload& idPayload);
   void sendAcknowledge(const RpcId& uid);
+  virtual void addIncomingRequest(const IdPayload& idPayload) {
+    incomingRequests.insert(make_pair(idPayload.id, idPayload.payload));
+  }
+  virtual void addIncomingReply(const RpcId& uid, const string& payload) {
+    incomingReplies.emplace(uid, payload);
+  }
+
+  virtual void send(const string& message) = 0;
 };
 }  // namespace codefs
 

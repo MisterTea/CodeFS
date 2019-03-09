@@ -8,13 +8,27 @@ class MessageWriter {
  public:
   MessageWriter() : packHandler(buffer) {}
 
-  inline void start() {
-    buffer.clear();
-  }
+  inline void start() { buffer.clear(); }
 
   template <typename T>
   inline void writePrimitive(const T& t) {
     packHandler.pack(t);
+  }
+
+  template <typename K, typename V>
+  inline void writeMap(const map<K, V>& m) {
+    packHandler.pack_map(m.size());
+    for (auto& it : m) {
+      writePrimitive(it.first);
+      writePrimitive(it.second);
+    }
+  }
+
+  template <typename T>
+  inline void writeClass(const T& t) {
+    string s(sizeof(T), '\0');
+    memcpy(&s[0], &t, sizeof(T));
+    writePrimitive<string>(s);
   }
 
   template <typename T>
@@ -29,6 +43,8 @@ class MessageWriter {
     start();
     return s;
   }
+
+  inline int64_t size() { return buffer.size(); }
 
  protected:
   msgpack::sbuffer buffer;

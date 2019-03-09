@@ -6,7 +6,8 @@
 namespace codefs {
 Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
     : address(_address), fileSystem(_fileSystem), fdCounter(1) {
-  rpc = shared_ptr<BiDirectionalRpc>(new BiDirectionalRpc(address, false));
+  rpc =
+      shared_ptr<ZmqBiDirectionalRpc>(new ZmqBiDirectionalRpc(address, false));
   writer.start();
   writer.writePrimitive<unsigned char>(CLIENT_SERVER_INIT);
   RpcId initId = rpc->request(writer.finish());
@@ -36,7 +37,7 @@ int Client::update() {
   rpc->update();
 
   while (rpc->hasIncomingRequest()) {
-    auto idPayload = rpc->consumeIncomingRequest();
+    auto idPayload = rpc->getFirstIncomingRequest();
     auto id = idPayload.id;
     string payload = idPayload.payload;
     reader.load(payload);
@@ -60,9 +61,7 @@ int Client::update() {
 }
 
 int Client::open(const string& path, int flags, mode_t mode) {
-  if (flags & O_CREAT) {
-    LOG(ERROR) << "O_CREAT NOT SUPPORTED YET";
-  }
+  fileSystem->invalidatePathAndParent(path);
   string payload;
   {
     lock_guard<std::recursive_mutex> lock(rpcMutex);
@@ -89,6 +88,7 @@ int Client::open(const string& path, int flags, mode_t mode) {
   }
 }
 int Client::close(const string& path) {
+  fileSystem->invalidatePath(path);
   string payload;
   {
     lock_guard<std::recursive_mutex> lock(rpcMutex);
@@ -133,7 +133,7 @@ int Client::pwrite(const string& path, const char* buf, int size, int offset) {
 }
 
 int Client::mkdir(const string& path, mode_t mode) {
-  fileSystem->invalidateParentAndPath(path);
+  fileSystem->invalidatePathAndParent(path);
   string payload;
   {
     lock_guard<std::recursive_mutex> lock(rpcMutex);
@@ -157,28 +157,28 @@ int Client::mkdir(const string& path, mode_t mode) {
 }
 
 int Client::unlink(const string& path) {
-  fileSystem->invalidateParentAndPath(path);
+  fileSystem->invalidatePathAndParent(path);
   return singlePathNoReturn(CLIENT_SERVER_UNLINK, path);
 }
 
 int Client::rmdir(const string& path) {
-  fileSystem->invalidateParentAndPath(path);
+  fileSystem->invalidatePathAndParent(path);
   return singlePathNoReturn(CLIENT_SERVER_RMDIR, path);
 }
 
 int Client::symlink(const string& from, const string& to) {
-  fileSystem->invalidateParentAndPath(from);
-  fileSystem->invalidateParentAndPath(to);
+  fileSystem->invalidatePathAndParent(from);
+  fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_SYMLINK, from, to);
 }
 int Client::rename(const string& from, const string& to) {
-  fileSystem->invalidateParentAndPath(from);
-  fileSystem->invalidateParentAndPath(to);
+  fileSystem->invalidatePathAndParent(from);
+  fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_RENAME, from, to);
 }
 int Client::link(const string& from, const string& to) {
-  fileSystem->invalidateParentAndPath(from);
-  fileSystem->invalidateParentAndPath(to);
+  fileSystem->invalidatePathAndParent(from);
+  fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_LINK, from, to);
 }
 
@@ -413,12 +413,18 @@ int Client::singlePathNoReturn(unsigned char header, const string& path) {
 }
 
 string Client::fileRpc(const string& payload) {
-  auto id = rpc->request(payload);
+  RpcId id;
+  {
+    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    id = rpc->request(payload);
+  }
   while (true) {
     usleep(100);
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
-    if (rpc->hasIncomingReplyWithId(id)) {
-      return rpc->consumeIncomingReplyWithId(id);
+    {
+      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      if (rpc->hasIncomingReplyWithId(id)) {
+        return rpc->consumeIncomingReplyWithId(id);
+      }
     }
   }
 }
