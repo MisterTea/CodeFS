@@ -142,7 +142,7 @@ target_link_libraries (
   ${GFLAGS_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
-  ${OSXFUSE_LIBRARIES}
+  ${LIBFUSE_LIBRARIES}
   ${fswatch_LIBRARIES}
 )
 
@@ -167,7 +167,7 @@ target_link_libraries (
   ${GFLAGS_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
-  ${OSXFUSE_LIBRARIES}
+  ${LIBFUSE_LIBRARIES}
   ${fswatch_LIBRARIES}
 )
 

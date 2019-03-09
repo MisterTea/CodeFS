@@ -2,6 +2,9 @@
 code-coverage.info
 code_coverage_report
 
+# VSCode
+.vscode
+
 # OS/X Junk file
 .DS_Store
 

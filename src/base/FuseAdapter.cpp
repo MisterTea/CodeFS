@@ -163,11 +163,7 @@ static int codefs_listxattr(const char *path, char *list, size_t size) {
 }
 
 static int codefs_getxattr(const char *path, const char *name, char *value,
-                           size_t size, uint32_t position) {
-  if (position) {
-    LOG(FATAL) << "Got a non-zero position: " << position;
-  }
-
+                           size_t size) {
   const FileData *fileData = fileSystem->getNode(path);
   if (fileData == NULL) {
     return -1 * ENOENT;
@@ -182,7 +178,18 @@ static int codefs_getxattr(const char *path, const char *name, char *value,
       return fileData->xattr_value(a).length();
     }
   }
+#ifndef ENOATTR
+#define ENOATTR (0)
+#endif
   return -ENOATTR;
+}
+
+static int codefs_getxattr_osx(const char *path, const char *name, char *value,
+                               size_t size, uint32_t position) {
+  if (position) {
+    LOG(FATAL) << "Got a non-zero position: " << position;
+  }
+  return codefs_getxattr(path, name, value, size);
 }
 
 #if 0

@@ -35,10 +35,6 @@ int ServerFileSystem::writeFile(const string& path,
   while (bytesWritten < fileContents.length()) {
     size_t written = fwrite(fileContents.c_str() + bytesWritten,
                             fileContents.length() - bytesWritten, 1, fp);
-    if (written == -1) {
-      LOG(FATAL) << "WRITE FILE FAILED";
-      return -1;
-    }
     bytesWritten += written;
   }
   fclose(fp);

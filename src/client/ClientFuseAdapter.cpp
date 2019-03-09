@@ -169,14 +169,19 @@ static int codefs_removexattr(const char *path, const char *name) {
 }
 
 static int codefs_setxattr(const char *path, const char *name,
-                           const char *value, size_t size, int flags,
-                           uint32_t position) {
-  if (position) {
-    LOG(FATAL) << "Got a non-zero position: " << position;
-  }
+                           const char *value, size_t size, int flags) {
   int res = client->lsetxattr(path, name, value, size, flags);
   if (res == -1) return -errno;
   return 0;
+}
+
+static int codefs_setxattr_osx(const char *path, const char *name,
+                               const char *value, size_t size, int flags,
+                               uint32_t position) {
+  if (position) {
+    LOG(FATAL) << "Got a non-zero position: " << position;
+  }
+  return codefs_setxattr(path, name, value, size, flags);
 }
 
 static int codefs_lock(const char *path, struct fuse_file_info *fi, int cmd,
