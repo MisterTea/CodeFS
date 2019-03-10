@@ -47,7 +47,6 @@ int Client::update() {
         string path = reader.readPrimitive<string>();
         LOG(INFO) << "UPDATING PATH: " << path;
         FileData fileData = reader.readProto<FileData>();
-        ownedFileContents.erase(path);
         fileSystem->setNode(fileData);
         writer.start();
         writer.writePrimitive(header);
@@ -96,7 +95,9 @@ int Client::close(const string& path) {
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_RETURN_FILE);
     writer.writePrimitive<string>(path);
-    writer.writePrimitive<string>(ownedFileContents[path]);
+    writer.writePrimitive<string>(ownedFileContents.at(path));
+    LOG(INFO) << "RETURNED FILE " << path << " TO SERVER WITH "
+              << ownedFileContents[path].size() << " BYTES";
     ownedFileContents.erase(path);
     payload = writer.finish();
   }
@@ -131,8 +132,9 @@ int Client::pread(const string& path, char* buf, int size, int offset) {
 int Client::pwrite(const string& path, const char* buf, int size, int offset) {
   auto it = ownedFileContents.find(path);
   if (it == ownedFileContents.end()) {
-    LOG(FATAL) << "TRIED TO READ AN INVALID PATH";
+    LOG(FATAL) << "TRIED TO READ AN INVALID PATH: " << path;
   }
+  LOG(INFO) << "WRITING " << size << " TO " << path;
   if (int(it->second.size()) < offset + size) {
     it->second.resize(offset + size, '\0');
   }

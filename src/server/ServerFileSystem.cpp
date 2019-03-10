@@ -18,7 +18,7 @@ void ServerFileSystem::rescanPath(const string& absolutePath) {
     LOG(FATAL) << "TRIED TO RESCAN WITH NO HANDLER";
   }
   LOG(INFO) << "UPDATING METADATA: " << absolutePath;
-  handler->metadataUpdated(absolutePath, fileData);
+  handler->metadataUpdated(absoluteToRelative(absolutePath), fileData);
 }
 
 string ServerFileSystem::readFile(const string& path) {

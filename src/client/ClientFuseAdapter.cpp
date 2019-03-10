@@ -90,10 +90,12 @@ static int codefs_open(const char *path, struct fuse_file_info *fi) {
     modes++;
     if (fi->flags & O_APPEND) {
       // We need to get the file from the server to append
+      LOG(FATAL) << "APPEND NOT SUPPORTED YET";
     }
   }
   if (readWriteMode == O_RDWR) {
     // The file is opened in read-write mode.
+    LOG(FATAL) << "read/write not supported yet";
     modes++;
   }
   if (modes != 1) {
@@ -123,7 +125,7 @@ static int codefs_write(const char *path, const char *buf, size_t size,
                         off_t offset, struct fuse_file_info *fi) {
   int res;
 
-  (void)path;
+  LOG(INFO) << "IN WRITE";
   res = client->pwrite(path, buf, size, offset);
   if (res == -1) res = -errno;
 

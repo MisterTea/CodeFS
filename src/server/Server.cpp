@@ -84,8 +84,7 @@ int Server::update() {
         }
 
         if (access) {
-          bool skipLoadingFile =
-              (readWriteMode == O_WRONLY && !(flags & O_APPEND));
+          bool skipLoadingFile = false;  // O_TRUNC never occurs in FUSE
           string fileContents = "";
           if (!skipLoadingFile) {
             fileContents = fileSystem->readFile(path);
