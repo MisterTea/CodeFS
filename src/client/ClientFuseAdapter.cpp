@@ -95,7 +95,6 @@ static int codefs_open(const char *path, struct fuse_file_info *fi) {
   }
   if (readWriteMode == O_RDWR) {
     // The file is opened in read-write mode.
-    LOG(FATAL) << "read/write not supported yet";
     modes++;
   }
   if (modes != 1) {
