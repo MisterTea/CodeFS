@@ -16,9 +16,10 @@ void Scanner::scanRecursively(FileSystem* fileSystem, const string& path_string,
       // path exists
       for (auto& p : boost::filesystem::directory_iterator(pt)) {
         string p_str = p.path().string();
-        if (boost::filesystem::is_regular_file(p.path())) {
+        if (boost::filesystem::is_regular_file(p.path()) ||
+            boost::filesystem::is_symlink(p.path())) {
           LOG(INFO) << "SCANNING FILE " << p_str;
-          FileData p_filedata = scanNode(fileSystem, p_str, result);
+          scanNode(fileSystem, p_str, result);
         } else if (boost::filesystem::is_directory(p.path())) {
           scanRecursively(fileSystem, p_str, result);
         } else {
@@ -32,6 +33,8 @@ void Scanner::scanRecursively(FileSystem* fileSystem, const string& path_string,
   } catch (const boost::filesystem::filesystem_error& ex) {
     LOG(FATAL) << ex.what();
   }
+
+  LOG(INFO) << "RECURSIVE SCAN FINISHED";
   return;
 }
 
@@ -44,24 +47,24 @@ FileData Scanner::scanNode(FileSystem* fileSystem, const string& path,
   fd.set_deleted(false);
   fd.set_invalid(false);
 
-  if (access(path.c_str(), F_OK) != 0) {
+  if (::faccessat(0, path.c_str(), F_OK, AT_SYMLINK_NOFOLLOW) != 0) {
     // The file is gone
     result->erase(fileSystem->absoluteToRelative(path));
     fd.set_deleted(true);
     return fd;
   }
 
-  if (access(path.c_str(), R_OK) == 0) {
+  if (::faccessat(0, path.c_str(), R_OK, AT_SYMLINK_NOFOLLOW) == 0) {
     fd.set_can_read(true);
   } else {
     fd.set_can_read(false);
   }
-  if (access(path.c_str(), W_OK) == 0) {
+  if (::faccessat(0, path.c_str(), W_OK, AT_SYMLINK_NOFOLLOW) == 0) {
     fd.set_can_write(true);
   } else {
     fd.set_can_write(false);
   }
-  if (access(path.c_str(), X_OK) == 0) {
+  if (::faccessat(0, path.c_str(), X_OK, AT_SYMLINK_NOFOLLOW) == 0) {
     fd.set_can_execute(true);
   } else {
     fd.set_can_execute(false);
@@ -86,6 +89,9 @@ FileData Scanner::scanNode(FileSystem* fileSystem, const string& path,
     int nbytes = readlink(path.c_str(), &s[0], bufsiz);
     FATAL_FAIL(nbytes);
     s = s.substr(0, nbytes + 1);
+    if (s[0] == '/') {
+      s = fileSystem->absoluteToRelative(s);
+    }
     fd.set_symlink_contents(s);
   }
 

@@ -35,12 +35,12 @@ void runFsWatch() {
           case MovedFrom:
           case MovedTo:
           case Created:
-          case PlatformSpecific:
             globalFileSystem->rescanPathAndParent(it.get_path());
             break;
           case IsFile:
           case IsDir:
           case IsSymLink:
+          case PlatformSpecific:
             break;
           case Overflow:
             LOG(FATAL) << "Overflow";
@@ -62,7 +62,7 @@ void runFsWatch() {
   // active_monitor->set_directory_only(directory_only);
   // active_monitor->set_event_type_filters(event_filters);
   // active_monitor->set_filters(filters);
-  active_monitor->set_follow_symlinks(true);
+  // active_monitor->set_follow_symlinks(true);
   // active_monitor->set_watch_access(watch_access);
 
   // Start the monitor

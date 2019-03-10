@@ -27,17 +27,17 @@ string ServerFileSystem::readFile(const string& path) {
 
 int ServerFileSystem::writeFile(const string& path,
                                 const string& fileContents) {
-  FILE* fp = fopen(relativeToAbsolute(path).c_str(), "wb");
+  FILE* fp = ::fopen(relativeToAbsolute(path).c_str(), "wb");
   if (fp == NULL) {
     return -1;
   }
   size_t bytesWritten = 0;
   while (bytesWritten < fileContents.length()) {
-    size_t written = fwrite(fileContents.c_str() + bytesWritten,
-                            fileContents.length() - bytesWritten, 1, fp);
+    size_t written = ::fwrite(fileContents.c_str() + bytesWritten, 1,
+                              fileContents.length() - bytesWritten, fp);
     bytesWritten += written;
   }
-  fclose(fp);
+  ::fclose(fp);
   return 0;
 }
 }  // namespace codefs

@@ -45,6 +45,7 @@ int Client::update() {
     switch (header) {
       case SERVER_CLIENT_METADATA_UPDATE: {
         string path = reader.readPrimitive<string>();
+        LOG(INFO) << "UPDATING PATH: " << path;
         FileData fileData = reader.readProto<FileData>();
         ownedFileContents.erase(path);
         fileSystem->setNode(fileData);
@@ -117,19 +118,26 @@ int Client::pread(const string& path, char* buf, int size, int offset) {
   if (it == ownedFileContents.end()) {
     LOG(FATAL) << "TRIED TO READ AN INVALID PATH";
   }
-  memcpy(buf, it->second.c_str() + offset, size);
-  return 0;
+  if (offset >= int(it->second.size())) {
+    return 0;
+  }
+  auto start = it->second.c_str() + offset;
+  int actualSize = min(int(it->second.size()), offset + size) - offset;
+  LOG(INFO) << it->second.size() << " " << size << " " << offset << " "
+            << actualSize << endl;
+  memcpy(buf, start, actualSize);
+  return actualSize;
 }
 int Client::pwrite(const string& path, const char* buf, int size, int offset) {
   auto it = ownedFileContents.find(path);
   if (it == ownedFileContents.end()) {
     LOG(FATAL) << "TRIED TO READ AN INVALID PATH";
   }
-  if (it->second.size() < offset + size) {
+  if (int(it->second.size()) < offset + size) {
     it->second.resize(offset + size, '\0');
   }
   memcpy(&(it->second[offset]), buf, size);
-  return 0;
+  return size;
 }
 
 int Client::mkdir(const string& path, mode_t mode) {
@@ -167,19 +175,27 @@ int Client::rmdir(const string& path) {
 }
 
 int Client::symlink(const string& from, const string& to) {
-  fileSystem->invalidatePathAndParent(from);
+  auto relativeFrom = from;
+  if (relativeFrom[0] == '/') {
+    relativeFrom = fileSystem->absoluteToRelative(relativeFrom);
+  }
   fileSystem->invalidatePathAndParent(to);
-  return twoPathsNoReturn(CLIENT_SERVER_SYMLINK, from, to);
+  return twoPathsNoReturn(CLIENT_SERVER_SYMLINK, relativeFrom, to);
 }
+
 int Client::rename(const string& from, const string& to) {
   fileSystem->invalidatePathAndParent(from);
   fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_RENAME, from, to);
 }
+
 int Client::link(const string& from, const string& to) {
-  fileSystem->invalidatePathAndParent(from);
+  auto relativeFrom = from;
+  if (relativeFrom[0] == '/') {
+    relativeFrom = fileSystem->absoluteToRelative(relativeFrom);
+  }
   fileSystem->invalidatePathAndParent(to);
-  return twoPathsNoReturn(CLIENT_SERVER_LINK, from, to);
+  return twoPathsNoReturn(CLIENT_SERVER_LINK, relativeFrom, to);
 }
 
 int Client::chmod(const string& path, int mode) {

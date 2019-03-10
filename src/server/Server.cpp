@@ -102,7 +102,8 @@ int Server::update() {
       case CLIENT_SERVER_RETURN_FILE: {
         string path = reader.readPrimitive<string>();
         string fileContents = reader.readPrimitive<string>();
-        LOG(INFO) << "WRITING FILE " << path << " " << fileContents;
+        LOG(INFO) << "WRITING FILE " << path << " " << fileContents.size()
+                  << " " << fileContents;
 
         int res = fileSystem->writeFile(path, fileContents);
 
@@ -167,9 +168,12 @@ int Server::update() {
       } break;
       case CLIENT_SERVER_SYMLINK: {
         string from = reader.readPrimitive<string>();
+        if (from[0] == '/') {
+          from = fileSystem->relativeToAbsolute(from);
+        }
         string to = reader.readPrimitive<string>();
-        int res = ::symlink(fileSystem->relativeToAbsolute(from).c_str(),
-                            fileSystem->relativeToAbsolute(to).c_str());
+        int res =
+            ::symlink(from.c_str(), fileSystem->relativeToAbsolute(to).c_str());
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);

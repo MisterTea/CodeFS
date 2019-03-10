@@ -62,15 +62,8 @@ int main(int argc, char *argv[]) {
   // Reconfigure default logger to apply settings above
   el::Loggers::reconfigureLogger("default", defaultConf);
 
-  char codefsTemplate[] = "/tmp/codefs_tmp_dir.XXXXXX";
-  char *dir_name = mkdtemp(codefsTemplate);
-
-  if (dir_name == NULL) {
-    LOG(FATAL) << "Could not create temporary directory for codefs";
-  }
-
   shared_ptr<ClientFileSystem> fileSystem(
-      new ClientFileSystem(string(dir_name)));
+      new ClientFileSystem(FLAGS_mountpoint));
   shared_ptr<Client> client(new Client(
       string("tcp://") + FLAGS_hostname + ":" + to_string(FLAGS_port),
       fileSystem));

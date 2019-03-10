@@ -70,17 +70,21 @@ static int codefs_readlink(const char *path, char *buf, size_t size) {
     return -ENOENT;
   }
 
-  auto contentsSize = fileData->symlink_contents().length();
+  string absoluteTo = fileData->symlink_contents();
+  if (absoluteTo[0] == '/') {
+    absoluteTo = fileSystem->relativeToAbsolute(absoluteTo);
+  }
+  auto contentsSize = absoluteTo.length();
   if (contentsSize == 0) {
     return -EINVAL;
   }
   if (contentsSize >= size) {
-    memcpy(buf, fileData->symlink_contents().c_str(), size);
-    return size;
+    memcpy(buf, absoluteTo.c_str(), size);
   } else {
-    memcpy(buf, fileData->symlink_contents().c_str(), contentsSize);
-    return contentsSize;
+    memcpy(buf, absoluteTo.c_str(), contentsSize);
   }
+  // NOTE: This is different than POSIX readlink which returns the size
+  return 0;
 }
 
 static int codefs_opendir(const char *path, struct fuse_file_info *fi) {
@@ -127,7 +131,12 @@ static int codefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
 
     struct stat st;
     memset(&st, 0, sizeof(struct stat));
+    LOG(INFO) << "GETTING NODE: " << filePath;
     auto childNode = fileSystem->getNode(filePath);
+    if (childNode == NULL) {
+      LOG(FATAL) << "MISSING PATH: " << filePath;
+      continue;
+    }
     FileSystem::protoToStat(childNode->stat_data(), &st);
     if (filler(buf, fileName.c_str(), &st, d->offset + 1)) break;
 

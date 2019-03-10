@@ -113,7 +113,6 @@ static int codefs_read(const char *path, char *buf, size_t size, off_t offset,
                        struct fuse_file_info *fi) {
   int res;
 
-  (void)path;
   res = client->pread(path, buf, size, offset);
   if (res == -1) res = -errno;
 

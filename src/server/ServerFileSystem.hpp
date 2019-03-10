@@ -22,7 +22,9 @@ class ServerFileSystem : public FileSystem {
   void rescanPath(const string &absolutePath);
   inline void rescanPathAndParent(const string &absolutePath) {
     rescanPath(absolutePath);
-    rescanPath(boost::filesystem::path(absolutePath).parent_path().string());
+    if (absoluteToRelative(absolutePath) != string("/")) {
+      rescanPath(boost::filesystem::path(absolutePath).parent_path().string());
+    }
   }
 
   string readFile(const string &path);
