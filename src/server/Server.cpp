@@ -103,8 +103,7 @@ int Server::update() {
       case CLIENT_SERVER_RETURN_FILE: {
         string path = reader.readPrimitive<string>();
         string fileContents = reader.readPrimitive<string>();
-        LOG(INFO) << "WRITING FILE " << path << " " << fileContents.size()
-                  << " " << fileContents;
+        LOG(INFO) << "WRITING FILE " << path << " " << fileContents.size();
 
         int res = fileSystem->writeFile(path, fileContents);
 
@@ -302,6 +301,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
+        fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_LREMOVEXATTR: {
         string path = reader.readPrimitive<string>();

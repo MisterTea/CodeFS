@@ -37,6 +37,8 @@ class FileSystem {
         bool invalid = it->second.invalid();
         if (!invalid) {
           return &(it->second);
+        } else {
+          LOG(INFO) << path << " is invalid, waiting for new version";
         }
       }
       usleep(1000);
