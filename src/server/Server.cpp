@@ -18,6 +18,8 @@ int Server::update() {
     rpc->update();
   }
 
+  MessageWriter writer;
+  MessageReader reader;
   while (true) {
     RpcId id;
     string payload;
@@ -364,6 +366,7 @@ int Server::update() {
 }
 
 void Server::metadataUpdated(const string &path, const FileData &fileData) {
+  MessageWriter writer;
   writer.start();
   writer.writePrimitive<unsigned char>(SERVER_CLIENT_METADATA_UPDATE);
   writer.writePrimitive<string>(path);

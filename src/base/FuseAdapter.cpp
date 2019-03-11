@@ -232,7 +232,11 @@ void FuseAdapter::assignCallbacks(shared_ptr<FileSystem> _fileSystem,
   ops->opendir = codefs_opendir;
   ops->readdir = codefs_readdir;
   ops->releasedir = codefs_releasedir;
+#if __APPLE__
+  ops->getxattr = codefs_getxattr_osx;
+#else
   ops->getxattr = codefs_getxattr;
+#endif
   ops->listxattr = codefs_listxattr;
 }
 

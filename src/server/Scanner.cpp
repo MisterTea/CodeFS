@@ -47,7 +47,34 @@ FileData Scanner::scanNode(FileSystem* fileSystem, const string& path,
   fd.set_deleted(false);
   fd.set_invalid(false);
 
+#if __APPLE__
+  // faccessat doesn't have AT_SYMLINK_NOFOLLOW
+  if (::faccessat(0, path.c_str(), F_OK, 0) != 0) {
+    LOG(INFO) << "FILE IS GONE: " << path << " " << errno;
+    // The file is gone
+    result->erase(fileSystem->absoluteToRelative(path));
+    fd.set_deleted(true);
+    return fd;
+  }
+
+  if (::faccessat(0, path.c_str(), R_OK, 0) == 0) {
+    fd.set_can_read(true);
+  } else {
+    fd.set_can_read(false);
+  }
+  if (::faccessat(0, path.c_str(), W_OK, 0) == 0) {
+    fd.set_can_write(true);
+  } else {
+    fd.set_can_write(false);
+  }
+  if (::faccessat(0, path.c_str(), X_OK, 0) == 0) {
+    fd.set_can_execute(true);
+  } else {
+    fd.set_can_execute(false);
+  }
+#else
   if (::faccessat(0, path.c_str(), F_OK, AT_SYMLINK_NOFOLLOW) != 0) {
+    LOG(INFO) << "FILE IS GONE: " << path << " " << errno;
     // The file is gone
     result->erase(fileSystem->absoluteToRelative(path));
     fd.set_deleted(true);
@@ -69,8 +96,11 @@ FileData Scanner::scanNode(FileSystem* fileSystem, const string& path,
   } else {
     fd.set_can_execute(false);
   }
+#endif
+
   struct stat fileStat;
   FATAL_FAIL(lstat(path.c_str(), &fileStat));
+
   StatData fStat;
   FileSystem::statToProto(fileStat, &fStat);
   *(fd.mutable_stat_data()) = fStat;
@@ -121,6 +151,7 @@ FileData Scanner::scanNode(FileSystem* fileSystem, const string& path,
     }
   }
 
+  LOG(INFO) << "SETTING: " << fileSystem->absoluteToRelative(path);
   (*result)[fileSystem->absoluteToRelative(path)] = fd;
   return fd;
 }

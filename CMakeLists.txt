@@ -40,12 +40,20 @@ LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 # Required packages
 find_package(Threads REQUIRED)
 find_package(GFlags REQUIRED)
-find_package(LibFUSE REQUIRED)
 find_package(ZeroMQ REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem)
 find_package(fswatch REQUIRED)
+
+IF(APPLE)
 find_package(OSXFuse REQUIRED)
+SET(FUSE_INCLUDE_DIR ${OSXFUSE_INCLUDE_DIR})
+SET(FUSE_LIBRARIES ${OSXFUSE_LIBRARIES})
+ELSE(APPLE)
+find_package(LibFUSE REQUIRED)
+SET(FUSE_INCLUDE_DIR ${LIBFUSE_INCLUDE_DIRS})
+SET(FUSE_LIBRARIES ${LIBFUSE_LIBRARIES})
+ENDIF(APPLE)
 
 IF(FREEBSD)
   set(CORE_LIBRARIES util)
@@ -76,7 +84,7 @@ include_directories(
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${GFLAGS_INCLUDE_DIRS}
-  ${LIBFUSE_INCLUDE_DIRS}
+  ${FUSE_INCLUDE_DIR}
   ${Boost_INCLUDE_DIRS}
   ${ZMQ_INCLUDE_DIRS}
   ${fswatch_INCLUDE_DIRS}
@@ -142,7 +150,7 @@ target_link_libraries (
   ${GFLAGS_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
-  ${LIBFUSE_LIBRARIES}
+  ${FUSE_LIBRARIES}
   ${fswatch_LIBRARIES}
 )
 
@@ -167,7 +175,7 @@ target_link_libraries (
   ${GFLAGS_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
-  ${LIBFUSE_LIBRARIES}
+  ${FUSE_LIBRARIES}
   ${fswatch_LIBRARIES}
 )
 

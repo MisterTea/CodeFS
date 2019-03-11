@@ -143,13 +143,17 @@ static int codefs_statfs(const char *path, struct statvfs *stbuf) {
 }
 
 static int codefs_release(const char *path, struct fuse_file_info *fi) {
-  LOG(INFO) << "RELEASING FD " << fi->fh;
+  LOG(INFO) << "RELEASING " << path << " FD " << fi->fh;
   auto it = clientFileSystem->fdMap.find((int64_t)(fi->fh));
   if (it == clientFileSystem->fdMap.end()) {
     LOG(FATAL) << "Tried to close an fd that doesn't exist";
   }
+  string pathFromFd = it->second.path;
+  if (pathFromFd != string(path)) {
+    LOG(ERROR) << "PATHS DO NOT MATCH! " << pathFromFd << " " << path;
+  }
   clientFileSystem->fdMap.erase(it);
-  client->close(path);
+  client->close(pathFromFd);
   return 0;
 }
 
@@ -216,7 +220,11 @@ void ClientFuseAdapter::assignClientCallbacks(
   ops->write = codefs_write;
   ops->statfs = codefs_statfs;
   ops->release = codefs_release;
+#if __APPLE__
+  ops->setxattr = codefs_setxattr_osx;
+#else
   ops->setxattr = codefs_setxattr;
+#endif
   ops->removexattr = codefs_removexattr;
 }
 

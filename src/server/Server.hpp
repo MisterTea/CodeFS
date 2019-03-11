@@ -38,8 +38,6 @@ class Server : public ServerFileSystem::Handler {
   shared_ptr<ServerFileSystem> fileSystem;
   int clientFd;
   Scanner scanner;
-  MessageReader reader;
-  MessageWriter writer;
   recursive_mutex rpcMutex;
   unordered_set<string> clientLockedPaths;
 };

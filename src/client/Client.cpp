@@ -22,8 +22,10 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
       int numFileData = reader.readPrimitive<int>();
       vector<FileData> allFileData;
       allFileData.reserve(numFileData);
+      LOG(INFO) << "GOT NUM FILE DATA: " << numFileData << endl;
       for (int a = 0; a < numFileData; a++) {
         allFileData.push_back(reader.readProto<FileData>());
+        LOG(INFO) << "GOT FILE DATA WITH PATH: " << allFileData.back().path();
       }
       fileSystem->init(allFileData);
       break;
@@ -97,7 +99,7 @@ int Client::close(const string& path) {
     writer.writePrimitive<string>(path);
     writer.writePrimitive<string>(ownedFileContents.at(path));
     LOG(INFO) << "RETURNED FILE " << path << " TO SERVER WITH "
-              << ownedFileContents[path].size() << " BYTES";
+              << ownedFileContents.at(path).size() << " BYTES";
     ownedFileContents.erase(path);
     payload = writer.finish();
   }
