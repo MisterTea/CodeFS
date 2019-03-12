@@ -124,7 +124,7 @@ static int codefs_write(const char *path, const char *buf, size_t size,
                         off_t offset, struct fuse_file_info *fi) {
   int res;
 
-  LOG(INFO) << "IN WRITE";
+  LOG(INFO) << "IN WRITE: " << path << ":" << offset;
   res = client->pwrite(path, buf, size, offset);
   if (res == -1) res = -errno;
 
@@ -143,8 +143,9 @@ static int codefs_statfs(const char *path, struct statvfs *stbuf) {
 }
 
 static int codefs_release(const char *path, struct fuse_file_info *fi) {
-  LOG(INFO) << "RELEASING " << path << " FD " << fi->fh;
-  auto it = clientFileSystem->fdMap.find((int64_t)(fi->fh));
+  int fd = fi->fh;
+  LOG(INFO) << "RELEASING " << path << " FD " << fd;
+  auto it = clientFileSystem->fdMap.find((int64_t)(fd));
   if (it == clientFileSystem->fdMap.end()) {
     LOG(FATAL) << "Tried to close an fd that doesn't exist";
   }
@@ -153,7 +154,7 @@ static int codefs_release(const char *path, struct fuse_file_info *fi) {
     LOG(ERROR) << "PATHS DO NOT MATCH! " << pathFromFd << " " << path;
   }
   clientFileSystem->fdMap.erase(it);
-  client->close(pathFromFd);
+  client->close(path, fd);
   return 0;
 }
 
@@ -188,11 +189,6 @@ static int codefs_setxattr_osx(const char *path, const char *name,
   return codefs_setxattr(path, name, value, size, flags);
 }
 
-static int codefs_lock(const char *path, struct fuse_file_info *fi, int cmd,
-                       struct flock *flockObj) {
-  return 0;
-}
-
 void ClientFuseAdapter::assignClientCallbacks(
     shared_ptr<ClientFileSystem> _fileSystem, shared_ptr<Client> _client,
     fuse_operations *ops) {
@@ -208,7 +204,6 @@ void ClientFuseAdapter::assignClientCallbacks(
   ops->rmdir = codefs_rmdir;
   ops->rename = codefs_rename;
   ops->link = codefs_link;
-  ops->lock = codefs_lock;
   ops->chmod = codefs_chmod;
   ops->chown = codefs_chown;
   ops->truncate = codefs_truncate;

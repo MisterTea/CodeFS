@@ -6,6 +6,13 @@
 #include "ZmqBiDirectionalRpc.hpp"
 
 namespace codefs {
+struct OwnedFileInfo {
+  unordered_set<int> fds;
+  string content;
+
+  OwnedFileInfo(int fd, string _content) : content(_content) { fds.insert(fd); }
+};
+
 class Client {
  public:
   Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem);
@@ -14,7 +21,7 @@ class Client {
 
   int open(const string& path, int flags, mode_t mode);
   int open(const string& path, int flags) { return open(path, flags, 0); }
-  int close(const string& path);
+  int close(const string& path, int fd);
   int pread(const string& path, char* buf, int size, int offset);
   int pwrite(const string& path, const char* buf, int size, int offset);
 
@@ -40,7 +47,7 @@ class Client {
   string address;
   shared_ptr<ZmqBiDirectionalRpc> rpc;
   shared_ptr<ClientFileSystem> fileSystem;
-  unordered_map<string, string> ownedFileContents;
+  unordered_map<string, OwnedFileInfo> ownedFileContents;
   MessageReader reader;
   MessageWriter writer;
   recursive_mutex rpcMutex;

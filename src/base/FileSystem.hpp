@@ -26,17 +26,17 @@ class FileSystem {
     boost::trim_right_if(rootPath, boost::is_any_of("/"));
   }
 
-  virtual const FileData *getNode(const string &path) {
+  virtual optional<FileData> getNode(const string &path) {
     while (true) {
       {
         std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
         auto it = allFileData.find(path);
         if (it == allFileData.end()) {
-          return NULL;
+          return nullopt;
         }
         bool invalid = it->second.invalid();
         if (!invalid) {
-          return &(it->second);
+          return it->second;
         } else {
           LOG(INFO) << path << " is invalid, waiting for new version";
         }
@@ -73,9 +73,8 @@ class FileSystem {
   }
 
   inline bool hasDirectory(const string &path) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    return allFileData.find(path) != allFileData.end() &&
-           S_ISDIR(allFileData.find(path)->second.stat_data().mode());
+    auto fileData = getNode(path);
+    return fileData && S_ISDIR(fileData->stat_data().mode());
   }
 
   static inline void statToProto(const struct stat &fileStat, StatData *fStat) {

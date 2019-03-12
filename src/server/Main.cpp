@@ -1,7 +1,6 @@
 #include "Server.hpp"
 
 #include "LogHandler.hpp"
-#include "Scanner.hpp"
 #include "ServerFileSystem.hpp"
 
 DEFINE_int32(port, 2298, "Port to listen on");
@@ -28,7 +27,7 @@ void runFsWatch() {
           case Link:
           case OwnerModified:
           case AttributeModified:
-            globalFileSystem->rescanPath(it.get_path());
+            globalFileSystem->rescanPathAndParent(it.get_path());
             break;
           case Removed:
           case Renamed:
@@ -44,6 +43,8 @@ void runFsWatch() {
             break;
           case Overflow:
             LOG(FATAL) << "Overflow";
+          default:
+            LOG(FATAL) << "Unhandled flag " << it2;
         }
       }
       cout << ")" << endl;

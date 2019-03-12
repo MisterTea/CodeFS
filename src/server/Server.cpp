@@ -34,8 +34,8 @@ int Server::update() {
     }
     reader.load(payload);
     unsigned char header = reader.readPrimitive<unsigned char>();
-    LOG(INFO) << "CONSUMING REQUEST: " << id.str() << ": " << header << " "
-              << payload;
+    LOG(INFO) << "CONSUMING REQUEST: " << id.str() << ": " << int(header) << " "
+              << payload.size();
     switch (header) {
       case CLIENT_SERVER_REQUEST_FILE: {
         string path = reader.readPrimitive<string>();
@@ -43,14 +43,13 @@ int Server::update() {
         int readWriteMode = (flags & O_ACCMODE);
         LOG(INFO) << "REQUESTING FILE: " << path << " FLAGS: " << flags << " "
                   << readWriteMode;
-        const FileData *fileData = fileSystem->getNode(path);
-        LOG(INFO) << "FILEDATA: " << long(fileData);
+        optional<FileData> fileData = fileSystem->getNode(path);
 
         writer.start();
 
         bool access = true;
         if (readWriteMode == O_RDONLY) {
-          if (fileData == NULL) {
+          if (!fileData) {
             writer.writePrimitive<int>(ENOENT);
             writer.writePrimitive<string>("");
             access = false;
@@ -60,15 +59,16 @@ int Server::update() {
             access = false;
           }
         } else {
-          if (fileData == NULL) {
+          if (!fileData) {
             LOG(INFO) << "FILE DOES NOT EXIST YET";
             // Get the parent path and make sure we can write there
             string parentPath =
                 boost::filesystem::path(path).parent_path().string();
             LOG(INFO) << "PARENT PATH: " << parentPath;
             if (parentPath != string("/")) {
-              const FileData *parentFileData = fileSystem->getNode(parentPath);
-              if (parentFileData == NULL || !parentFileData->can_execute()) {
+              optional<FileData> parentFileData =
+                  fileSystem->getNode(parentPath);
+              if (!parentFileData || !parentFileData->can_execute()) {
                 writer.writePrimitive<int>(EACCES);
                 writer.writePrimitive<string>("");
                 access = false;
@@ -90,7 +90,7 @@ int Server::update() {
           string fileContents = "";
           if (!skipLoadingFile) {
             fileContents = fileSystem->readFile(path);
-            LOG(INFO) << "READ FILE: " << path << " " << fileContents;
+            LOG(INFO) << "READ FILE: " << path << " " << fileContents.size();
           }
 
           clientLockedPaths.insert(path);
@@ -115,7 +115,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
-        fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_INIT: {
         LOG(INFO) << "INITIALIZING";
@@ -130,7 +130,7 @@ int Server::update() {
       case CLIENT_SERVER_MKDIR: {
         string path = reader.readPrimitive<string>();
         mode_t mode = reader.readPrimitive<int>();
-        int res = ::mkdir(fileSystem->relativeToAbsolute(path).c_str(), mode);
+        int res = fileSystem->mkdir(path, mode);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -144,7 +144,7 @@ int Server::update() {
         string path = reader.readPrimitive<string>();
         LOG(INFO) << "UNLINKING: " << path << " "
                   << fileSystem->relativeToAbsolute(path);
-        int res = ::unlink(fileSystem->relativeToAbsolute(path).c_str());
+        int res = fileSystem->unlink(path);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -156,7 +156,7 @@ int Server::update() {
       } break;
       case CLIENT_SERVER_RMDIR: {
         string path = reader.readPrimitive<string>();
-        int res = ::rmdir(fileSystem->relativeToAbsolute(path).c_str());
+        int res = fileSystem->rmdir(path);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -172,8 +172,7 @@ int Server::update() {
           from = fileSystem->relativeToAbsolute(from);
         }
         string to = reader.readPrimitive<string>();
-        int res =
-            ::symlink(from.c_str(), fileSystem->relativeToAbsolute(to).c_str());
+        int res = fileSystem->symlink(from, to);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -187,8 +186,7 @@ int Server::update() {
       case CLIENT_SERVER_RENAME: {
         string from = reader.readPrimitive<string>();
         string to = reader.readPrimitive<string>();
-        int res = ::rename(fileSystem->relativeToAbsolute(from).c_str(),
-                           fileSystem->relativeToAbsolute(to).c_str());
+        int res = fileSystem->rename(from, to);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -202,8 +200,7 @@ int Server::update() {
       case CLIENT_SERVER_LINK: {
         string from = reader.readPrimitive<string>();
         string to = reader.readPrimitive<string>();
-        int res = ::link(fileSystem->relativeToAbsolute(from).c_str(),
-                         fileSystem->relativeToAbsolute(to).c_str());
+        int res = fileSystem->link(from, to);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -217,7 +214,7 @@ int Server::update() {
       case CLIENT_SERVER_CHMOD: {
         string path = reader.readPrimitive<string>();
         int mode = reader.readPrimitive<int>();
-        int res = ::chmod(fileSystem->relativeToAbsolute(path).c_str(), mode);
+        int res = fileSystem->chmod(path, mode);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -231,8 +228,7 @@ int Server::update() {
         string path = reader.readPrimitive<string>();
         int64_t uid = reader.readPrimitive<int64_t>();
         int64_t gid = reader.readPrimitive<int64_t>();
-        int res =
-            ::lchown(fileSystem->relativeToAbsolute(path).c_str(), uid, gid);
+        int res = fileSystem->lchown(path, uid, gid);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -245,8 +241,7 @@ int Server::update() {
       case CLIENT_SERVER_TRUNCATE: {
         string path = reader.readPrimitive<string>();
         int64_t size = reader.readPrimitive<int64_t>();
-        int res =
-            ::truncate(fileSystem->relativeToAbsolute(path).c_str(), size);
+        int res = fileSystem->truncate(path, size);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -292,8 +287,7 @@ int Server::update() {
         ts[0].tv_nsec = reader.readPrimitive<int64_t>();
         ts[1].tv_sec = reader.readPrimitive<int64_t>();
         ts[1].tv_nsec = reader.readPrimitive<int64_t>();
-        int res = ::utimensat(0, fileSystem->relativeToAbsolute(path).c_str(),
-                              ts, AT_SYMLINK_NOFOLLOW);
+        int res = fileSystem->utimensat(path, ts);
         writer.writePrimitive<int>(res);
         if (res) {
           writer.writePrimitive<int>(errno);
@@ -306,8 +300,7 @@ int Server::update() {
       case CLIENT_SERVER_LREMOVEXATTR: {
         string path = reader.readPrimitive<string>();
         string name = reader.readPrimitive<string>();
-        int res = ::lremovexattr(fileSystem->relativeToAbsolute(path).c_str(),
-                                 name.c_str());
+        int res = fileSystem->lremovexattr(path, name);
         if (res) {
           writer.writePrimitive<int>(errno);
         } else {
@@ -322,9 +315,7 @@ int Server::update() {
         string value = reader.readPrimitive<string>();
         int64_t size = reader.readPrimitive<int64_t>();
         int flags = reader.readPrimitive<int>();
-        string absolutePath = fileSystem->relativeToAbsolute(path);
-        int res = ::lsetxattr(absolutePath.c_str(), name.c_str(), value.c_str(),
-                              size, flags);
+        int res = fileSystem->lsetxattr(path, name, value, size, flags);
         if (res) {
           writer.writePrimitive<int>(errno);
         } else {

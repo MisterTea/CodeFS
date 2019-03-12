@@ -6,13 +6,15 @@
 namespace codefs {
 shared_ptr<FileSystem> fileSystem;
 
+static void *codefs_init(struct fuse_conn_info *conn) { return NULL; }
+
 static int codefs_getattr(const char *path, struct stat *stbuf) {
   if (stbuf == NULL) {
     LOG(FATAL) << "Tried to getattr with a NULL stat object";
   }
 
-  const FileData *fileData = fileSystem->getNode(path);
-  if (fileData == NULL) {
+  optional<FileData> fileData = fileSystem->getNode(path);
+  if (!fileData) {
     LOG(INFO) << "MISSING FILE NODE FOR " << path;
     return -1 * ENOENT;
   }
@@ -33,8 +35,8 @@ static int codefs_fgetattr(const char *path, struct stat *stbuf,
 }
 
 static int codefs_access(const char *path, int mask) {
-  const FileData *fileData = fileSystem->getNode(path);
-  if (fileData == NULL) {
+  optional<FileData> fileData = fileSystem->getNode(path);
+  if (!fileData) {
     return -1 * ENOENT;
   }
   LOG(INFO) << "CHECKING ACCESS FOR " << path << " " << mask;
@@ -65,8 +67,8 @@ static int codefs_access(const char *path, int mask) {
 }
 
 static int codefs_readlink(const char *path, char *buf, size_t size) {
-  const FileData *fileData = fileSystem->getNode(path);
-  if (fileData == NULL) {
+  optional<FileData> fileData = fileSystem->getNode(path);
+  if (!fileData) {
     return -ENOENT;
   }
 
@@ -118,8 +120,12 @@ static int codefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   if (offset != d->offset) {
     d->offset = offset;
   }
+  auto node = fileSystem->getNode(d->directory);
+  if (!node) {
+    // Directory is gone
+    return 0;
+  }
   while (1) {
-    auto node = fileSystem->getNode(d->directory);
     LOG(INFO) << "NUM CHILDREN: " << node->child_node_size();
     if (node->child_node_size() <= d->offset) {
       break;
@@ -133,8 +139,8 @@ static int codefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     memset(&st, 0, sizeof(struct stat));
     LOG(INFO) << "GETTING NODE: " << filePath;
     auto childNode = fileSystem->getNode(filePath);
-    if (childNode == NULL) {
-      LOG(FATAL) << "MISSING PATH: " << filePath;
+    if (!childNode) {
+      LOG(ERROR) << "MISSING PATH: " << filePath;
       continue;
     }
     FileSystem::protoToStat(childNode->stat_data(), &st);
@@ -155,8 +161,8 @@ static int codefs_releasedir(const char *path, struct fuse_file_info *fi) {
 }
 
 static int codefs_listxattr(const char *path, char *list, size_t size) {
-  const FileData *fileData = fileSystem->getNode(path);
-  if (fileData == NULL) {
+  optional<FileData> fileData = fileSystem->getNode(path);
+  if (!fileData) {
     return -1 * ENOENT;
   }
   string s;
@@ -173,8 +179,8 @@ static int codefs_listxattr(const char *path, char *list, size_t size) {
 
 static int codefs_getxattr(const char *path, const char *name, char *value,
                            size_t size) {
-  const FileData *fileData = fileSystem->getNode(path);
-  if (fileData == NULL) {
+  optional<FileData> fileData = fileSystem->getNode(path);
+  if (!fileData) {
     return -1 * ENOENT;
   }
   for (int a = 0; a < fileData->xattr_key().size(); a++) {
@@ -201,6 +207,111 @@ static int codefs_getxattr_osx(const char *path, const char *name, char *value,
   return codefs_getxattr(path, name, value, size);
 }
 
+static int codefs_fsync(const char *, int, struct fuse_file_info *) {
+  return 0;
+}
+
+static int codefs_fsyncdir(const char *, int, struct fuse_file_info *) {
+  return 0;
+}
+
+map<string, struct flock> readLocks;
+map<string, struct flock> writeLocks;
+static int codefs_lock(const char *path, struct fuse_file_info *fi, int cmd,
+                       struct flock *lockp) {
+  LOG(INFO) << "LOCK CALLED FOR PATH " << string(path) << " and fh " << fi->fh;
+  struct flock lockCopy = *lockp;
+  auto owner = fi->lock_owner;
+  string pathString = string(path);
+  switch (cmd) {
+    case F_GETLK:
+      switch (lockCopy.l_type) {
+        case F_WRLCK:
+          // write-locks also check for read locks
+
+          // TODO: Check offset and length instead of just file
+          if (writeLocks.find(pathString) != writeLocks.end()) {
+            *lockp = writeLocks.at(pathString);
+          } else if (readLocks.find(pathString) != readLocks.end()) {
+            *lockp = readLocks.at(pathString);
+          } else {
+            lockp->l_type = F_UNLCK;
+          }
+          break;
+        case F_RDLCK:
+          // TODO: Check offset and length instead of just file
+          if (readLocks.find(pathString) != readLocks.end()) {
+            *lockp = readLocks.at(pathString);
+          } else {
+            lockp->l_type = F_UNLCK;
+          }
+          break;
+      }
+      break;
+    case F_SETLK:
+      switch (lockCopy.l_type) {
+        case F_WRLCK:
+          if (writeLocks.find(pathString) != writeLocks.end()) {
+            auto &lock = writeLocks.at(pathString);
+            if (lock.l_pid == lockCopy.l_pid) {
+              lock = lockCopy;
+            } else {
+              return -1 * EAGAIN;
+            }
+          }
+          if (readLocks.find(pathString) != readLocks.end()) {
+            auto &lock = readLocks.at(pathString);
+            if (lock.l_pid == lockCopy.l_pid) {
+              lock = lockCopy;
+            } else {
+              return -1 * EAGAIN;
+            }
+          }
+          break;
+        case F_RDLCK:
+          if (readLocks.find(pathString) != readLocks.end()) {
+            auto &lock = readLocks.at(pathString);
+            if (lock.l_pid == lockCopy.l_pid) {
+              lock = lockCopy;
+            } else {
+              return -1 * EAGAIN;
+            }
+          }
+          break;
+        case F_UNLCK:
+          if (writeLocks.find(pathString) != writeLocks.end()) {
+            auto &lock = writeLocks.at(pathString);
+            if (lock.l_pid == lockCopy.l_pid) {
+              writeLocks.erase(writeLocks.find(pathString));
+            } else {
+              return -1 * EAGAIN;
+            }
+          }
+          if (readLocks.find(pathString) != readLocks.end()) {
+            auto &lock = readLocks.at(pathString);
+            if (lock.l_pid == lockCopy.l_pid) {
+              readLocks.erase(readLocks.find(pathString));
+            } else {
+              return -1 * EAGAIN;
+            }
+          }
+          break;
+      }
+      break;
+    case F_SETLKW:
+      LOG(FATAL) << "This can't happen because FUSE is single threaded.";
+      break;
+    default:
+      LOG(FATAL) << "Invalid lock command";
+  }
+  return 0;
+}
+
+static int codefs_flock(const char *path, struct fuse_file_info *fi, int op) {
+  LOG(INFO) << "FLOCK CALLED";
+  return 0;
+}
+
 #if 0
 static const struct fuse_opt codefs_opts[] = {
     // { "case_insensitive", offsetof(struct loopback, case_insensitive), 1 },
@@ -225,6 +336,7 @@ void FuseAdapter::assignCallbacks(shared_ptr<FileSystem> _fileSystem,
     LOG(FATAL) << "Already initialized FUSE ops!";
   }
   fileSystem = _fileSystem;
+  ops->init = codefs_init;
   ops->getattr = codefs_getattr;
   ops->fgetattr = codefs_fgetattr;
   ops->access = codefs_access;
@@ -232,6 +344,10 @@ void FuseAdapter::assignCallbacks(shared_ptr<FileSystem> _fileSystem,
   ops->opendir = codefs_opendir;
   ops->readdir = codefs_readdir;
   ops->releasedir = codefs_releasedir;
+  ops->fsync = codefs_fsync;
+  ops->fsyncdir = codefs_fsyncdir;
+  ops->lock = codefs_lock;
+  // ops->flock = codefs_flock;
 #if __APPLE__
   ops->getxattr = codefs_getxattr_osx;
 #else

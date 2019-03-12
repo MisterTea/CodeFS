@@ -110,9 +110,6 @@ class BiDirectionalRpc {
   deque<IdPayload> outgoingReplies;
   unordered_map<RpcId, string> incomingReplies;
 
-  MessageReader reader;
-  MessageWriter writer;
-
   deque<int> rpcTime;
 
   uint64_t onBarrier;

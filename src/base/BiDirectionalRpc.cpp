@@ -37,6 +37,7 @@ void BiDirectionalRpc::resendRandomOutgoingMessage() {
 
 void BiDirectionalRpc::receive(const string& message) {
   VLOG(1) << "Receiving message with length " << message.length();
+  MessageReader reader;
   reader.load(message);
   RpcHeader header = (RpcHeader)reader.readPrimitive<unsigned char>();
   if (flaky && rand() % 2 == 0) {
@@ -219,6 +220,7 @@ void BiDirectionalRpc::tryToSendBarrier() {
 
 void BiDirectionalRpc::sendRequest(const IdPayload& idPayload) {
   VLOG(1) << "SENDING REQUEST: " << idPayload.id.str();
+  MessageWriter writer;
   writer.start();
   set<RpcId> rpcsSent;
 
@@ -255,6 +257,7 @@ void BiDirectionalRpc::sendReply(const IdPayload& idPayload) {
   set<RpcId> rpcsSent;
 
   rpcsSent.insert(idPayload.id);
+  MessageWriter writer;
   writer.start();
   writer.writePrimitive<unsigned char>(REPLY);
   writer.writeClass<RpcId>(idPayload.id);
@@ -284,6 +287,7 @@ void BiDirectionalRpc::sendReply(const IdPayload& idPayload) {
 }
 
 void BiDirectionalRpc::sendAcknowledge(const RpcId& uid) {
+  MessageWriter writer;
   writer.start();
   writer.writePrimitive<unsigned char>(ACKNOWLEDGE);
   writer.writeClass<RpcId>(uid);

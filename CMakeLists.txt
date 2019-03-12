@@ -81,6 +81,7 @@ add_custom_target(
 include_directories(
   src/base
   external/msgpack-3.0.1/include
+  external/Optional
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${GFLAGS_INCLUDE_DIRS}

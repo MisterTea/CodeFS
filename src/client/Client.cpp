@@ -82,14 +82,26 @@ int Client::open(const string& path, int flags, mode_t mode) {
       errno = rpcErrno;
       return -1;
     }
-    ownedFileContents.erase(path);
-    string fileContents = reader.readPrimitive<string>();
-    LOG(INFO) << "READ FILE: " << path << " WITH CONTENTS " << fileContents;
-    ownedFileContents.emplace(path, fileContents);
-    return fdCounter++;
+    int fd = fdCounter++;
+    if (ownedFileContents.find(path) == ownedFileContents.end()) {
+      string fileContents = reader.readPrimitive<string>();
+      LOG(INFO) << "READ FILE: " << path << " WITH CONTENTS SIZE "
+                << fileContents.size();
+      ownedFileContents.insert(
+          make_pair(path, OwnedFileInfo(fd, fileContents)));
+    } else {
+      LOG(INFO) << "FILE IS ALREADY IN LOCAL CACHE, SKIPPING READ";
+      ownedFileContents.at(path).fds.insert(fd);
+    }
+    return fd;
   }
 }
-int Client::close(const string& path) {
+int Client::close(const string& path, int fd) {
+  fileSystem->invalidatePathAndParent(path);
+  auto& ownedFile = ownedFileContents.at(path);
+  if (ownedFile.fds.find(fd) == ownedFile.fds.end()) {
+    LOG(FATAL) << "Tried to close a file handle that is not owned";
+  }
   fileSystem->invalidatePath(path);
   string payload;
   {
@@ -97,12 +109,17 @@ int Client::close(const string& path) {
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_RETURN_FILE);
     writer.writePrimitive<string>(path);
-    writer.writePrimitive<string>(ownedFileContents.at(path));
+    writer.writePrimitive<string>(ownedFile.content);
     LOG(INFO) << "RETURNED FILE " << path << " TO SERVER WITH "
-              << ownedFileContents.at(path).size() << " BYTES";
-    ownedFileContents.erase(path);
+              << ownedFile.content.size() << " BYTES";
     payload = writer.finish();
   }
+
+  ownedFile.fds.erase(ownedFile.fds.find(fd));
+  if (ownedFile.fds.empty()) {
+    ownedFileContents.erase(path);
+  }
+
   string result = fileRpc(payload);
   {
     lock_guard<std::recursive_mutex> lock(rpcMutex);
@@ -121,12 +138,13 @@ int Client::pread(const string& path, char* buf, int size, int offset) {
   if (it == ownedFileContents.end()) {
     LOG(FATAL) << "TRIED TO READ AN INVALID PATH";
   }
-  if (offset >= int(it->second.size())) {
+  const auto& content = it->second.content;
+  if (offset >= int(content.size())) {
     return 0;
   }
-  auto start = it->second.c_str() + offset;
-  int actualSize = min(int(it->second.size()), offset + size) - offset;
-  LOG(INFO) << it->second.size() << " " << size << " " << offset << " "
+  auto start = content.c_str() + offset;
+  int actualSize = min(int(content.size()), offset + size) - offset;
+  LOG(INFO) << content.size() << " " << size << " " << offset << " "
             << actualSize << endl;
   memcpy(buf, start, actualSize);
   return actualSize;
@@ -136,11 +154,12 @@ int Client::pwrite(const string& path, const char* buf, int size, int offset) {
   if (it == ownedFileContents.end()) {
     LOG(FATAL) << "TRIED TO READ AN INVALID PATH: " << path;
   }
-  LOG(INFO) << "WRITING " << size << " TO " << path;
-  if (int(it->second.size()) < offset + size) {
-    it->second.resize(offset + size, '\0');
+  auto& content = it->second.content;
+  LOG(INFO) << "WRITING " << size << " TO " << path << " AT " << offset;
+  if (int(content.size()) < offset + size) {
+    content.resize(offset + size, '\0');
   }
-  memcpy(&(it->second[offset]), buf, size);
+  memcpy(&(content[offset]), buf, size);
   return size;
 }
 
@@ -188,6 +207,13 @@ int Client::symlink(const string& from, const string& to) {
 }
 
 int Client::rename(const string& from, const string& to) {
+  if (ownedFileContents.find(from) != ownedFileContents.end()) {
+    if (ownedFileContents.find(to) != ownedFileContents.end()) {
+      LOG(FATAL) << "I don't handle renaming from one open file to another yet";
+    }
+    ownedFileContents.insert(make_pair(to, ownedFileContents.at(from)));
+    ownedFileContents.erase(ownedFileContents.find(from));
+  }
   fileSystem->invalidatePathAndParent(from);
   fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_RENAME, from, to);
@@ -250,6 +276,11 @@ int Client::lchown(const string& path, int64_t uid, int64_t gid) {
   }
 }
 int Client::truncate(const string& path, int64_t size) {
+  if (ownedFileContents.find(path) != ownedFileContents.end()) {
+    ownedFileContents.at(path).content.resize(size, '\0');
+    return 0;
+  }
+
   fileSystem->invalidatePath(path);
   string payload;
   {
