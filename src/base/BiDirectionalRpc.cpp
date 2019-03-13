@@ -12,7 +12,7 @@ void BiDirectionalRpc::shutdown() {}
 void BiDirectionalRpc::heartbeat() {
   VLOG(1) << "BEAT: " << int64_t(this);
   if (!outgoingReplies.empty() || !outgoingRequests.empty()) {
-    resendRandomOutgoingMessage();
+    // resendRandomOutgoingMessage();
   } else {
     VLOG(1) << "SENDING HEARTBEAT";
     string s = "0";
@@ -228,6 +228,7 @@ void BiDirectionalRpc::sendRequest(const IdPayload& idPayload) {
   writer.writePrimitive<unsigned char>(REQUEST);
   writer.writeClass<RpcId>(idPayload.id);
   writer.writePrimitive<string>(idPayload.payload);
+#if 0
   // Try to attach more requests to this packet
   int i = 0;
   while (!outgoingRequests.empty() &&
@@ -249,6 +250,7 @@ void BiDirectionalRpc::sendRequest(const IdPayload& idPayload) {
     writer.writePrimitive<string>(it->payload);
   }
   VLOG(1) << "Attached " << i << " extra packets";
+#endif
   send(writer.finish());
 }
 
@@ -262,6 +264,7 @@ void BiDirectionalRpc::sendReply(const IdPayload& idPayload) {
   writer.writePrimitive<unsigned char>(REPLY);
   writer.writeClass<RpcId>(idPayload.id);
   writer.writePrimitive<string>(idPayload.payload);
+#if 0
   // Try to attach more requests to this packet
   int i = 0;
   while (!outgoingReplies.empty() &&
@@ -283,6 +286,7 @@ void BiDirectionalRpc::sendReply(const IdPayload& idPayload) {
     writer.writePrimitive<string>(it->payload);
   }
   VLOG(1) << "Attached " << i << " extra packets";
+#endif
   send(writer.finish());
 }
 

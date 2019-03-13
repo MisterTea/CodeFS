@@ -63,7 +63,11 @@ int Client::update() {
 }
 
 int Client::open(const string& path, int flags, mode_t mode) {
-  fileSystem->invalidatePathAndParent(path);
+  bool readOnly = (mode == O_RDONLY);
+  LOG(INFO) << "Reading file " << path << " (readonly? " << readOnly << ")";
+  if (!readOnly) {
+    fileSystem->invalidatePathAndParent(path);
+  }
   string payload;
   {
     lock_guard<std::recursive_mutex> lock(rpcMutex);
@@ -82,7 +86,6 @@ int Client::open(const string& path, int flags, mode_t mode) {
       errno = rpcErrno;
       return -1;
     }
-    bool readOnly = (mode == O_RDONLY);
     int fd = fdCounter++;
     if (ownedFileContents.find(path) == ownedFileContents.end()) {
       string fileContents = reader.readPrimitive<string>();
@@ -101,12 +104,14 @@ int Client::open(const string& path, int flags, mode_t mode) {
   }
 }
 int Client::close(const string& path, int fd) {
-  fileSystem->invalidatePathAndParent(path);
   auto& ownedFile = ownedFileContents.at(path);
   if (ownedFile.fds.find(fd) == ownedFile.fds.end()) {
     LOG(FATAL) << "Tried to close a file handle that is not owned";
   }
-  fileSystem->invalidatePath(path);
+  if (!ownedFile.readOnly) {
+    LOG(INFO) << "Invalidating path";
+    fileSystem->invalidatePathAndParent(path);
+  }
   string payload;
   {
     lock_guard<std::recursive_mutex> lock(rpcMutex);
