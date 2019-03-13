@@ -12,11 +12,6 @@ void ServerFileSystem::init() {
 void ServerFileSystem::rescanPath(const string& absolutePath) {
   std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
   FileData fileData = scanNode(absolutePath, &allFileData);
-  if (handler == NULL) {
-    LOG(FATAL) << "TRIED TO RESCAN WITH NO HANDLER";
-  }
-  LOG(INFO) << "UPDATING METADATA: " << absolutePath;
-  handler->metadataUpdated(absoluteToRelative(absolutePath), fileData);
 }
 
 string ServerFileSystem::readFile(const string& path) {
@@ -51,7 +46,7 @@ void ServerFileSystem::scanRecursively(
 
   boost::filesystem::path pt(path_string);
   try {
-    if (exists(pt)) {
+    if (exists(pt) && boost::filesystem::is_directory(pt)) {
       // path exists
       for (auto& p : boost::filesystem::directory_iterator(pt)) {
         string p_str = p.path().string();
@@ -67,7 +62,8 @@ void ServerFileSystem::scanRecursively(
         }
       }
     } else {
-      LOG(FATAL) << "path " << path_string << "doesn't exist!";
+      LOG(ERROR) << "path " << path_string
+                 << "doesn't exist or isn't a directory!";
     }
   } catch (const boost::filesystem::filesystem_error& ex) {
     LOG(FATAL) << ex.what();
@@ -94,6 +90,11 @@ FileData ServerFileSystem::scanNode(const string& path,
     // The file is gone
     result->erase(absoluteToRelative(path));
     fd.set_deleted(true);
+    if (handler != NULL) {
+      LOG(INFO) << "UPDATING METADATA: " << path;
+      handler->metadataUpdated(absoluteToRelative(path), fd);
+    }
+
     return fd;
   }
 
@@ -118,6 +119,11 @@ FileData ServerFileSystem::scanNode(const string& path,
     // The file is gone
     result->erase(absoluteToRelative(path));
     fd.set_deleted(true);
+    if (handler != NULL) {
+      LOG(INFO) << "UPDATING METADATA: " << path;
+      handler->metadataUpdated(absoluteToRelative(path), fd);
+    }
+
     return fd;
   }
 
@@ -193,6 +199,12 @@ FileData ServerFileSystem::scanNode(const string& path,
 
   LOG(INFO) << "SETTING: " << absoluteToRelative(path);
   (*result)[absoluteToRelative(path)] = fd;
+
+  if (handler != NULL) {
+    LOG(INFO) << "UPDATING METADATA: " << path;
+    handler->metadataUpdated(absoluteToRelative(path), fd);
+  }
+
   return fd;
 }
 

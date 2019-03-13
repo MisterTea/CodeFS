@@ -194,11 +194,16 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
-        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(from));
-        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(to));
+        fileSystem->rescanPathAndParentAndChildren(
+            fileSystem->relativeToAbsolute(from));
+        fileSystem->rescanPathAndParentAndChildren(
+            fileSystem->relativeToAbsolute(to));
       } break;
       case CLIENT_SERVER_LINK: {
         string from = reader.readPrimitive<string>();
+        if (from[0] == '/') {
+          from = fileSystem->relativeToAbsolute(from);
+        }
         string to = reader.readPrimitive<string>();
         int res = fileSystem->link(from, to);
         writer.writePrimitive<int>(res);

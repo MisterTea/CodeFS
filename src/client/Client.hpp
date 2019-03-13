@@ -43,6 +43,14 @@ class Client {
   int lsetxattr(const string& path, const string& name, const string& value,
                 int64_t size, int flags);
 
+  optional<int64_t> getSizeOverride(const string& path) {
+    auto it = ownedFileContents.find(path);
+    if (it == ownedFileContents.end()) {
+      return optional<int64_t>();
+    }
+    return int64_t(it->second.content.size());
+  }
+
  protected:
   string address;
   shared_ptr<ZmqBiDirectionalRpc> rpc;

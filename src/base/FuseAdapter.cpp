@@ -8,32 +8,6 @@ shared_ptr<FileSystem> fileSystem;
 
 static void *codefs_init(struct fuse_conn_info *conn) { return NULL; }
 
-static int codefs_getattr(const char *path, struct stat *stbuf) {
-  if (stbuf == NULL) {
-    LOG(FATAL) << "Tried to getattr with a NULL stat object";
-  }
-
-  optional<FileData> fileData = fileSystem->getNode(path);
-  if (!fileData) {
-    LOG(INFO) << "MISSING FILE NODE FOR " << path;
-    return -1 * ENOENT;
-  }
-  FileSystem::protoToStat(fileData->stat_data(), stbuf);
-  return 0;
-}
-
-static int codefs_fgetattr(const char *path, struct stat *stbuf,
-                           struct fuse_file_info *fi) {
-  LOG(INFO) << "GETTING ATTR FOR FD " << fi->fh;
-  auto it = fileSystem->fdMap.find(fi->fh);
-  if (it == fileSystem->fdMap.end()) {
-    LOG(INFO) << "MISSING FD";
-    errno = EBADF;
-    return -errno;
-  }
-  return codefs_getattr(it->second.path.c_str(), stbuf);
-}
-
 static int codefs_access(const char *path, int mask) {
   optional<FileData> fileData = fileSystem->getNode(path);
   if (!fileData) {
@@ -120,32 +94,25 @@ static int codefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
   if (offset != d->offset) {
     d->offset = offset;
   }
-  auto node = fileSystem->getNode(d->directory);
+  optional<FileData> node;
+  vector<FileData> children;
+  node = fileSystem->getNodeAndChildren(d->directory, &children);
   if (!node) {
     // Directory is gone
     return 0;
   }
   while (1) {
-    LOG(INFO) << "NUM CHILDREN: " << node->child_node_size();
-    if (node->child_node_size() <= d->offset) {
+    LOG(INFO) << "NUM CHILDREN: " << children.size();
+    if (children.size() <= d->offset) {
       break;
     }
-    string fileName = node->child_node(d->offset);
-    string filePath = (boost::filesystem::path(node->path()) /
-                       boost::filesystem::path(fileName))
-                          .string();
+    const auto &child = children.at(d->offset);
+    string fileName = boost::filesystem::path(child.path()).filename().string();
 
     struct stat st;
     memset(&st, 0, sizeof(struct stat));
-    LOG(INFO) << "GETTING NODE: " << filePath;
-    auto childNode = fileSystem->getNode(filePath);
-    if (!childNode) {
-      LOG(ERROR) << "MISSING PATH: " << filePath;
-      continue;
-    }
-    FileSystem::protoToStat(childNode->stat_data(), &st);
+    FileSystem::protoToStat(child.stat_data(), &st);
     if (filler(buf, fileName.c_str(), &st, d->offset + 1)) break;
-
     (d->offset)++;
   }
 
@@ -337,8 +304,6 @@ void FuseAdapter::assignCallbacks(shared_ptr<FileSystem> _fileSystem,
   }
   fileSystem = _fileSystem;
   ops->init = codefs_init;
-  ops->getattr = codefs_getattr;
-  ops->fgetattr = codefs_fgetattr;
   ops->access = codefs_access;
   ops->readlink = codefs_readlink;
   ops->opendir = codefs_opendir;

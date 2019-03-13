@@ -20,11 +20,43 @@ class ServerFileSystem : public FileSystem {
   void setHandler(Handler *_handler) { handler = _handler; }
 
   void rescanPath(const string &absolutePath);
+
   inline void rescanPathAndParent(const string &absolutePath) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     rescanPath(absolutePath);
     if (absoluteToRelative(absolutePath) != string("/")) {
       rescanPath(boost::filesystem::path(absolutePath).parent_path().string());
     }
+  }
+
+  inline void rescanPathAndParentAndChildren(const string &absolutePath) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    if (absoluteToRelative(absolutePath) != string("/")) {
+      rescanPath(boost::filesystem::path(absolutePath).parent_path().string());
+    }
+    rescanPathAndChildren(absolutePath);
+  }
+
+  inline void rescanPathAndChildren(const string &absolutePath) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    auto node = getNode(absolutePath);
+    if (node) {
+      // scan node and known children envelope for deletion/update
+      string relativePath = absoluteToRelative(absolutePath);
+      vector<string> subPaths;
+      for (auto &it : allFileData) {
+        if (it.first.find(relativePath) == 0) {
+          // This is the node or a child
+          subPaths.push_back(it.first);
+        }
+      }
+      for (auto &it : subPaths) {
+        rescanPath(relativeToAbsolute(it));
+      }
+    }
+
+    // Begin recursive scan to pick up new children
+    scanRecursively(absolutePath, &allFileData);
   }
 
   string readFile(const string &path);

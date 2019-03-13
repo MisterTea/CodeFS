@@ -34,7 +34,7 @@ void runFsWatch() {
           case MovedFrom:
           case MovedTo:
           case Created:
-            globalFileSystem->rescanPathAndParent(it.get_path());
+            globalFileSystem->rescanPathAndParentAndChildren(it.get_path());
             break;
           case IsFile:
           case IsDir:

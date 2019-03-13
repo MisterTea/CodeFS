@@ -8,6 +8,36 @@ namespace codefs {
 shared_ptr<ClientFileSystem> clientFileSystem;
 shared_ptr<Client> client;
 
+static int codefs_getattr(const char *path, struct stat *stbuf) {
+  if (stbuf == NULL) {
+    LOG(FATAL) << "Tried to getattr with a NULL stat object";
+  }
+
+  optional<FileData> fileData = clientFileSystem->getNode(path);
+  if (!fileData) {
+    LOG(INFO) << "MISSING FILE NODE FOR " << path;
+    return -1 * ENOENT;
+  }
+  optional<int64_t> fileSizeOverride = client->getSizeOverride(path);
+  if (fileSizeOverride) {
+    fileData->mutable_stat_data()->set_size(*fileSizeOverride);
+  }
+  FileSystem::protoToStat(fileData->stat_data(), stbuf);
+  return 0;
+}
+
+static int codefs_fgetattr(const char *path, struct stat *stbuf,
+                           struct fuse_file_info *fi) {
+  LOG(INFO) << "GETTING ATTR FOR FD " << fi->fh;
+  auto it = clientFileSystem->fdMap.find(fi->fh);
+  if (it == clientFileSystem->fdMap.end()) {
+    LOG(INFO) << "MISSING FD";
+    errno = EBADF;
+    return -errno;
+  }
+  return codefs_getattr(it->second.path.c_str(), stbuf);
+}
+
 static int codefs_mkdir(const char *path, mode_t mode) {
   int res = client->mkdir(path, mode);
   if (res == -1) return -errno;
@@ -200,6 +230,8 @@ void ClientFuseAdapter::assignClientCallbacks(
   client = _client;
   ops->mkdir = codefs_mkdir;
   ops->symlink = codefs_symlink;
+  ops->getattr = codefs_getattr;
+  ops->fgetattr = codefs_fgetattr;
   ops->unlink = codefs_unlink;
   ops->rmdir = codefs_rmdir;
   ops->rename = codefs_rename;

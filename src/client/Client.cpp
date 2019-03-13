@@ -198,12 +198,8 @@ int Client::rmdir(const string& path) {
 }
 
 int Client::symlink(const string& from, const string& to) {
-  auto relativeFrom = from;
-  if (relativeFrom[0] == '/') {
-    relativeFrom = fileSystem->absoluteToRelative(relativeFrom);
-  }
   fileSystem->invalidatePathAndParent(to);
-  return twoPathsNoReturn(CLIENT_SERVER_SYMLINK, relativeFrom, to);
+  return twoPathsNoReturn(CLIENT_SERVER_SYMLINK, from, to);
 }
 
 int Client::rename(const string& from, const string& to) {
@@ -220,12 +216,8 @@ int Client::rename(const string& from, const string& to) {
 }
 
 int Client::link(const string& from, const string& to) {
-  auto relativeFrom = from;
-  if (relativeFrom[0] == '/') {
-    relativeFrom = fileSystem->absoluteToRelative(relativeFrom);
-  }
   fileSystem->invalidatePathAndParent(to);
-  return twoPathsNoReturn(CLIENT_SERVER_LINK, relativeFrom, to);
+  return twoPathsNoReturn(CLIENT_SERVER_LINK, from, to);
 }
 
 int Client::chmod(const string& path, int mode) {

@@ -45,6 +45,55 @@ class FileSystem {
     }
   }
 
+  virtual optional<FileData> getNodeAndChildren(const string &path,
+                                                vector<FileData> *children) {
+    vector<FileData> tmpChildren;
+    auto startTime = time(NULL);
+    while (true) {
+      {
+        std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+        auto it = allFileData.find(path);
+        if (it == allFileData.end()) {
+          return nullopt;
+        }
+        bool invalid = it->second.invalid();
+        if (!invalid) {
+          FileData parentNode = it->second;
+
+          // Check the children
+          LOG(INFO) << "NUM CHILDREN: " << parentNode.child_node_size();
+          bool failed = false;
+          tmpChildren.clear();
+          for (int a = 0; a < parentNode.child_node_size(); a++) {
+            string fileName = parentNode.child_node(a);
+            string childPath = (boost::filesystem::path(parentNode.path()) /
+                                boost::filesystem::path(fileName))
+                                   .string();
+
+            auto childIt = allFileData.find(childPath);
+            if (childIt == allFileData.end() || childIt->second.invalid()) {
+              if (childIt == allFileData.end())
+                LOG(INFO) << "MISSING CHILD: " << childPath;
+              else
+                LOG(INFO) << "INVALID CHILD: " << childPath;
+              failed = true;
+              break;
+            }
+            tmpChildren.push_back(childIt->second);
+          }
+
+          if (!failed) {
+            *children = tmpChildren;
+            return parentNode;
+          }
+        } else {
+          LOG(INFO) << path << " is invalid, waiting for new version";
+        }
+      }
+      usleep(100 * 1000);
+    }
+  }
+
   void setNode(const FileData &fileData) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     allFileData.erase(fileData.path());
