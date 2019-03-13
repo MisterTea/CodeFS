@@ -188,7 +188,6 @@ static int codefs_lock(const char *path, struct fuse_file_info *fi, int cmd,
                        struct flock *lockp) {
   LOG(INFO) << "LOCK CALLED FOR PATH " << string(path) << " and fh " << fi->fh;
   struct flock lockCopy = *lockp;
-  auto owner = fi->lock_owner;
   string pathString = string(path);
   switch (cmd) {
     case F_GETLK:
@@ -271,11 +270,6 @@ static int codefs_lock(const char *path, struct fuse_file_info *fi, int cmd,
     default:
       LOG(FATAL) << "Invalid lock command";
   }
-  return 0;
-}
-
-static int codefs_flock(const char *path, struct fuse_file_info *fi, int op) {
-  LOG(INFO) << "FLOCK CALLED";
   return 0;
 }
 

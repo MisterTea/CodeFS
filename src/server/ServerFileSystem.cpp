@@ -48,7 +48,8 @@ void ServerFileSystem::scanRecursively(
   try {
     if (exists(pt) && boost::filesystem::is_directory(pt)) {
       // path exists
-      for (auto& p : boost::filesystem::directory_iterator(pt)) {
+      for (auto& p : boost::make_iterator_range(
+               boost::filesystem::directory_iterator(pt), {})) {
         string p_str = p.path().string();
         if (boost::filesystem::is_regular_file(p.path()) ||
             boost::filesystem::is_symlink(p.path())) {
@@ -173,7 +174,8 @@ FileData ServerFileSystem::scanNode(const string& path,
 
   if (S_ISDIR(fileStat.st_mode)) {
     // Populate children
-    for (auto& it : boost::filesystem::directory_iterator(path)) {
+    for (auto& it : boost::make_iterator_range(
+             boost::filesystem::directory_iterator(path), {})) {
       LOG(INFO) << "FOUND CHILD: " << it.path().filename().string();
       fd.add_child_node(it.path().filename().string());
     }

@@ -48,7 +48,6 @@ class FileSystem {
   virtual optional<FileData> getNodeAndChildren(const string &path,
                                                 vector<FileData> *children) {
     vector<FileData> tmpChildren;
-    auto startTime = time(NULL);
     while (true) {
       {
         std::lock_guard<std::recursive_mutex> lock(fileDataMutex);

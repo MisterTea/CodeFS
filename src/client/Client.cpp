@@ -82,16 +82,20 @@ int Client::open(const string& path, int flags, mode_t mode) {
       errno = rpcErrno;
       return -1;
     }
+    bool readOnly = (mode == O_RDONLY);
     int fd = fdCounter++;
     if (ownedFileContents.find(path) == ownedFileContents.end()) {
       string fileContents = reader.readPrimitive<string>();
       LOG(INFO) << "READ FILE: " << path << " WITH CONTENTS SIZE "
                 << fileContents.size();
       ownedFileContents.insert(
-          make_pair(path, OwnedFileInfo(fd, fileContents)));
+          make_pair(path, OwnedFileInfo(fd, fileContents, readOnly)));
     } else {
       LOG(INFO) << "FILE IS ALREADY IN LOCAL CACHE, SKIPPING READ";
       ownedFileContents.at(path).fds.insert(fd);
+      if (!readOnly) {
+        ownedFileContents.at(path).readOnly = false;
+      }
     }
     return fd;
   }
@@ -109,9 +113,14 @@ int Client::close(const string& path, int fd) {
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_RETURN_FILE);
     writer.writePrimitive<string>(path);
-    writer.writePrimitive<string>(ownedFile.content);
-    LOG(INFO) << "RETURNED FILE " << path << " TO SERVER WITH "
-              << ownedFile.content.size() << " BYTES";
+    writer.writePrimitive<bool>(ownedFile.readOnly);
+    if (ownedFile.readOnly) {
+      LOG(INFO) << "RETURNED FILE " << path << " TO SERVER READ-ONLY";
+    } else {
+      writer.writePrimitive<string>(ownedFile.content);
+      LOG(INFO) << "RETURNED FILE " << path << " TO SERVER WITH "
+                << ownedFile.content.size() << " BYTES";
+    }
     payload = writer.finish();
   }
 
@@ -153,6 +162,9 @@ int Client::pwrite(const string& path, const char* buf, int size, int offset) {
   auto it = ownedFileContents.find(path);
   if (it == ownedFileContents.end()) {
     LOG(FATAL) << "TRIED TO READ AN INVALID PATH: " << path;
+  }
+  if (it->second.readOnly) {
+    LOG(FATAL) << "Tried to write to a read-only file: " << path;
   }
   auto& content = it->second.content;
   LOG(INFO) << "WRITING " << size << " TO " << path << " AT " << offset;

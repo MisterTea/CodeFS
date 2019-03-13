@@ -52,11 +52,11 @@ int main(int argc, char *argv[]) {
   // Setup easylogging configurations
   el::Configurations defaultConf =
       codefs::LogHandler::SetupLogHandler(&argc, &argv);
-  defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "true");
+  defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "false");
   el::Loggers::setVerboseLevel(3);
   // default max log file size is 20MB for etserver
   string maxlogsize = "20971520";
-  codefs::LogHandler::SetupLogFile(&defaultConf, "/tmp/codefs_server.log",
+  codefs::LogHandler::SetupLogFile(&defaultConf, "/tmp/codefs_client.log",
                                    maxlogsize);
 
   // Reconfigure default logger to apply settings above

@@ -102,10 +102,16 @@ int Server::update() {
       } break;
       case CLIENT_SERVER_RETURN_FILE: {
         string path = reader.readPrimitive<string>();
-        string fileContents = reader.readPrimitive<string>();
-        LOG(INFO) << "WRITING FILE " << path << " " << fileContents.size();
+        bool readOnly = reader.readPrimitive<bool>();
+        int res = 0;
+        if (readOnly) {
+          LOG(INFO) << "RETURNED READ-ONLY FILE";
+        } else {
+          string fileContents = reader.readPrimitive<string>();
+          LOG(INFO) << "WRITING FILE " << path << " " << fileContents.size();
 
-        int res = fileSystem->writeFile(path, fileContents);
+          res = fileSystem->writeFile(path, fileContents);
+        }
 
         writer.start();
         writer.writePrimitive<int>(res);
@@ -115,7 +121,9 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
-        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
+        if (!readOnly) {
+          fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
+        }
       } break;
       case CLIENT_SERVER_INIT: {
         LOG(INFO) << "INITIALIZING";

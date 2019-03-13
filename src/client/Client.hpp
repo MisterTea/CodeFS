@@ -9,8 +9,12 @@ namespace codefs {
 struct OwnedFileInfo {
   unordered_set<int> fds;
   string content;
+  bool readOnly;
 
-  OwnedFileInfo(int fd, string _content) : content(_content) { fds.insert(fd); }
+  OwnedFileInfo(int fd, string _content, bool _readOnly)
+      : content(_content), readOnly(_readOnly) {
+    fds.insert(fd);
+  }
 };
 
 class Client {
