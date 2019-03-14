@@ -17,6 +17,10 @@ void runFsWatch() {
                                    void *context) {
     cout << "GOT EVENT: " << events.size() << endl;
     for (const auto &it : events) {
+      if (it.get_path().find(FLAGS_path) != 0) {
+        LOG(ERROR) << "FSWatch event on invalid path: " << it.get_path();
+        continue;
+      }
       cout << it.get_path() << " " << it.get_time() << " (";
       for (const auto &it2 : it.get_flags()) {
         cout << fsw_get_event_flag_name(it2) << ", ";
