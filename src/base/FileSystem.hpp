@@ -99,7 +99,7 @@ class FileSystem {
     if (fileData.deleted()) {
       // The node is deleted, Don't add
     } else {
-      allFileData.emplace(fileData.path(), fileData);
+      allFileData.insert(make_pair(fileData.path(), fileData));
     }
   }
 

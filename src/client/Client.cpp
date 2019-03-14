@@ -49,6 +49,9 @@ int Client::update() {
         string path = reader.readPrimitive<string>();
         LOG(INFO) << "UPDATING PATH: " << path;
         FileData fileData = reader.readProto<FileData>();
+        if (path != fileData.path()) {
+          LOG(FATAL) << "PATH MISMATCH: " << path << " != " << fileData.path();
+        }
         fileSystem->setNode(fileData);
         writer.start();
         writer.writePrimitive(header);
