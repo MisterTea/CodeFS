@@ -130,7 +130,7 @@ static int codefs_open(const char *path, struct fuse_file_info *fi) {
   if (modes != 1) {
     LOG(FATAL) << "Invalid open modes: " << fi->flags;
   }
-  int fd = client->open(path, fi->flags);
+  int fd = client->open(path, fi->flags, readWriteMode);
   if (fd == -1) return -errno;
 
   fi->fh = fd;

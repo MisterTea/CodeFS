@@ -24,7 +24,6 @@ class Client {
   inline void heartbeat() { rpc->heartbeat(); }
 
   int open(const string& path, int flags, mode_t mode);
-  int open(const string& path, int flags) { return open(path, flags, 0); }
   int close(const string& path, int fd);
   int pread(const string& path, char* buf, int size, int offset);
   int pwrite(const string& path, const char* buf, int size, int offset);
