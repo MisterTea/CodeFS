@@ -35,7 +35,8 @@ static int codefs_fgetattr(const char *path, struct stat *stbuf,
     errno = EBADF;
     return -errno;
   }
-  return codefs_getattr(it->second.path.c_str(), stbuf);
+  LOG(INFO) << "PATHS: " << string(path) << " " << it->second.path;
+  return codefs_getattr(path, stbuf);
 }
 
 static int codefs_mkdir(const char *path, mode_t mode) {

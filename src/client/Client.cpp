@@ -230,15 +230,16 @@ int Client::symlink(const string& from, const string& to) {
 }
 
 int Client::rename(const string& from, const string& to) {
+  LOG(INFO) << "RENAMING FROM " << from << " TO " << to;
+  if (ownedFileContents.find(to) != ownedFileContents.end()) {
+    LOG(FATAL) << "I don't handle renaming from one open file to another yet";
+  }
   if (ownedFileContents.find(from) != ownedFileContents.end()) {
-    if (ownedFileContents.find(to) != ownedFileContents.end()) {
-      LOG(FATAL) << "I don't handle renaming from one open file to another yet";
-    }
     ownedFileContents.insert(make_pair(to, ownedFileContents.at(from)));
     ownedFileContents.erase(ownedFileContents.find(from));
   }
-  fileSystem->invalidatePathAndParent(from);
-  fileSystem->invalidatePathAndParent(to);
+  fileSystem->invalidatePathAndParentAndChildren(from);
+  fileSystem->invalidatePathAndParentAndChildren(to);
   return twoPathsNoReturn(CLIENT_SERVER_RENAME, from, to);
 }
 

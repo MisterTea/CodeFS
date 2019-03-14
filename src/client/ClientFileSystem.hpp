@@ -42,6 +42,16 @@ class ClientFileSystem : public FileSystem {
     invalidatePath(path);
   }
 
+  inline void invalidatePathAndParentAndChildren(const string& path) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    invalidatePathAndParent(path);
+    for (auto& it : allFileData) {
+      if (it.first.find(path) == 0) {
+        it.second.set_invalid(true);
+      }
+    }
+  }
+
   inline optional<string> getCachedFile(const string& path) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     auto it = fileCache.find(path);
