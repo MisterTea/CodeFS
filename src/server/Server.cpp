@@ -98,7 +98,9 @@ int Server::update() {
           writer.writePrimitive<string>(fileContents);
         }
         reply(id, writer.finish());
-        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
+        if (readWriteMode != O_RDONLY) {
+          fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
+        }
       } break;
       case CLIENT_SERVER_RETURN_FILE: {
         string path = reader.readPrimitive<string>();

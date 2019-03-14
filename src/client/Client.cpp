@@ -65,43 +65,52 @@ int Client::update() {
 int Client::open(const string& path, int flags, mode_t mode) {
   bool readOnly = (mode == O_RDONLY);
   LOG(INFO) << "Reading file " << path << " (readonly? " << readOnly << ")";
-  if (!readOnly) {
-    fileSystem->invalidatePathAndParent(path);
-  }
-  string payload;
-  {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
-    writer.start();
-    writer.writePrimitive<unsigned char>(CLIENT_SERVER_REQUEST_FILE);
-    writer.writePrimitive<string>(path);
-    writer.writePrimitive<int>(flags);
-    payload = writer.finish();
-  }
-  string result = fileRpc(payload);
-  {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
-    reader.load(result);
-    int rpcErrno = reader.readPrimitive<int>();
-    if (rpcErrno) {
-      errno = rpcErrno;
-      return -1;
+  int fd = fdCounter++;
+
+  if (ownedFileContents.find(path) == ownedFileContents.end()) {
+    if (!readOnly) {
+      fileSystem->invalidatePathAndParent(path);
     }
-    int fd = fdCounter++;
-    if (ownedFileContents.find(path) == ownedFileContents.end()) {
-      string fileContents = reader.readPrimitive<string>();
-      LOG(INFO) << "READ FILE: " << path << " WITH CONTENTS SIZE "
-                << fileContents.size();
+
+    auto cachedData = fileSystem->getCachedFile(path);
+    if (readOnly && cachedData) {
+      LOG(INFO) << "FETCHING FROM FILE CACHE: " << cachedData->size();
       ownedFileContents.insert(
-          make_pair(path, OwnedFileInfo(fd, fileContents, readOnly)));
+          make_pair(path, OwnedFileInfo(fd, *cachedData, readOnly)));
     } else {
-      LOG(INFO) << "FILE IS ALREADY IN LOCAL CACHE, SKIPPING READ";
-      ownedFileContents.at(path).fds.insert(fd);
-      if (!readOnly) {
-        ownedFileContents.at(path).readOnly = false;
+      string payload;
+      {
+        lock_guard<std::recursive_mutex> lock(rpcMutex);
+        writer.start();
+        writer.writePrimitive<unsigned char>(CLIENT_SERVER_REQUEST_FILE);
+        writer.writePrimitive<string>(path);
+        writer.writePrimitive<int>(flags);
+        payload = writer.finish();
+      }
+      string result = fileRpc(payload);
+      {
+        lock_guard<std::recursive_mutex> lock(rpcMutex);
+        reader.load(result);
+        int rpcErrno = reader.readPrimitive<int>();
+        if (rpcErrno) {
+          errno = rpcErrno;
+          return -1;
+        }
+        string fileContents = reader.readPrimitive<string>();
+        LOG(INFO) << "READ FILE: " << path << " WITH CONTENTS SIZE "
+                  << fileContents.size();
+        ownedFileContents.insert(
+            make_pair(path, OwnedFileInfo(fd, fileContents, readOnly)));
       }
     }
-    return fd;
+  } else {
+    LOG(INFO) << "FILE IS ALREADY IN LOCAL CACHE, SKIPPING READ";
+    ownedFileContents.at(path).fds.insert(fd);
+    if (!readOnly) {
+      ownedFileContents.at(path).readOnly = false;
+    }
   }
+  return fd;
 }
 int Client::close(const string& path, int fd) {
   auto& ownedFile = ownedFileContents.at(path);
@@ -119,6 +128,7 @@ int Client::close(const string& path, int fd) {
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_RETURN_FILE);
     writer.writePrimitive<string>(path);
     writer.writePrimitive<bool>(ownedFile.readOnly);
+    fileSystem->setCachedFile(path, ownedFile.content);
     if (ownedFile.readOnly) {
       LOG(INFO) << "RETURNED FILE " << path << " TO SERVER READ-ONLY";
     } else {

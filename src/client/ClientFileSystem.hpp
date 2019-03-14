@@ -18,6 +18,13 @@ class ClientFileSystem : public FileSystem {
 
   inline void invalidatePath(const string& path) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    LOG(INFO) << "INVALIDATING PATH: " << path;
+    {
+      auto it = fileCache.find(path);
+      if (it != fileCache.end()) {
+        fileCache.erase(it);
+      }
+    }
     auto it = allFileData.find(path);
     if (it == allFileData.end()) {
       // Create empty invalid node
@@ -30,9 +37,28 @@ class ClientFileSystem : public FileSystem {
   }
 
   inline void invalidatePathAndParent(const string& path) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     invalidatePath(boost::filesystem::path(path).parent_path().string());
     invalidatePath(path);
   }
+
+  inline optional<string> getCachedFile(const string& path) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    auto it = fileCache.find(path);
+    if (it == fileCache.end()) {
+      return optional<string>();
+    } else {
+      return it->second;
+    }
+  }
+
+  inline void setCachedFile(const string& path, const string& data) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    fileCache[path] = data;
+  }
+
+ protected:
+  unordered_map<string, string> fileCache;
 };
 }  // namespace codefs
 
