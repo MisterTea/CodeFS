@@ -5,6 +5,8 @@
 
 DEFINE_int32(port, 2298, "Port to listen on");
 DEFINE_string(path, "", "Absolute path containing code for codefs to monitor");
+DEFINE_bool(verbose, true, "Verbose logging");
+DEFINE_bool(logtostdout, false, "Log to stdout in addition to the log file");
 
 namespace {
 shared_ptr<codefs::ServerFileSystem> globalFileSystem;
@@ -81,8 +83,9 @@ int main(int argc, char *argv[]) {
   // Setup easylogging configurations
   el::Configurations defaultConf =
       codefs::LogHandler::SetupLogHandler(&argc, &argv);
-  defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "true");
-  el::Loggers::setVerboseLevel(3);
+  defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput,
+                          FLAGS_logtostdout ? "true" : "false");
+  if (FLAGS_verbose) el::Loggers::setVerboseLevel(3);
   string maxlogsize = "20971520";
   codefs::LogHandler::SetupLogFile(&defaultConf, "/tmp/codefs_server.log",
                                    maxlogsize);

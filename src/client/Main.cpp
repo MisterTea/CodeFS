@@ -8,6 +8,8 @@ DEFINE_string(hostname, "localhost", "Hostname to connect to");
 DEFINE_int32(port, 2298, "Port to connect to");
 DEFINE_string(mountpoint, "/tmp/clientmount",
               "Where to mount the FS for server access");
+DEFINE_bool(verbose, true, "Verbose logging");
+DEFINE_bool(logtostdout, false, "Log to stdout in addition to the log file");
 
 namespace codefs {
 struct loopback {};
@@ -20,10 +22,18 @@ static const struct fuse_opt codefs_opts[] = {
 
 void runFuse(char *binaryLocation, shared_ptr<Client> client,
              shared_ptr<ClientFileSystem> fileSystem) {
-  int argc = 4;
-  const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-d",
-                              "-s"};
-  char **argv = (char **)const_argv;
+  int argc;
+  char **argv;
+  if (FLAGS_logtostdout) {
+    argc = 4;
+    const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-d",
+                                "-s"};
+    argv = (char **)const_argv;
+  } else {
+    argc = 3;
+    const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-s"};
+    argv = (char **)const_argv;
+  }
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
   if (fuse_opt_parse(&args, &loopback, codefs_opts, NULL) == -1) {
@@ -42,6 +52,8 @@ void runFuse(char *binaryLocation, shared_ptr<Client> client,
   if (res) {
     LOG(FATAL) << "Unclean exit from fuse thread: " << res
                << " (errno: " << errno << ")";
+  } else {
+    LOG(INFO) << "FUSE THREAD EXIT";
   }
 }
 
@@ -52,8 +64,9 @@ int main(int argc, char *argv[]) {
   // Setup easylogging configurations
   el::Configurations defaultConf =
       codefs::LogHandler::SetupLogHandler(&argc, &argv);
-  defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "true");
-  el::Loggers::setVerboseLevel(3);
+  defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput,
+                          FLAGS_logtostdout ? "true" : "false");
+  if (FLAGS_verbose) el::Loggers::setVerboseLevel(3);
   // default max log file size is 20MB for etserver
   string maxlogsize = "20971520";
   codefs::LogHandler::SetupLogFile(&defaultConf, "/tmp/codefs_client.log",
