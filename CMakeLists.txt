@@ -3,6 +3,7 @@ project (CodeFS)
 
 option(BUILD_TEST "Build all unit test" ON)
 option(CODE_COVERAGE "Enable code coverage" OFF)
+option(BUILD_CLIENT "Build the client (depends on fuse)" ON)
 
 
 set (${PROJECT_NAME}_VERSION_MAJOR 0)
@@ -45,6 +46,7 @@ find_package(Protobuf REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem)
 find_package(fswatch REQUIRED)
 
+IF(BUILD_CLIENT)
 IF(APPLE)
 find_package(OSXFuse REQUIRED)
 SET(FUSE_INCLUDE_DIR ${OSXFUSE_INCLUDE_DIR})
@@ -54,16 +56,13 @@ find_package(LibFUSE REQUIRED)
 SET(FUSE_INCLUDE_DIR ${LIBFUSE_INCLUDE_DIRS})
 SET(FUSE_LIBRARIES ${LIBFUSE_LIBRARIES})
 ENDIF(APPLE)
+ENDIF(BUILD_CLIENT)
 
 IF(FREEBSD)
   set(CORE_LIBRARIES util)
 ELSE()
   set(CORE_LIBRARIES util resolv)
 ENDIF()
-IF(APPLE)
-ELSE(APPLE)
-  SET(CORE_LIBRARIES ulockmgr ${CORE_LIBRARIES})
-ENDIF(APPLE)
 
 PROTOBUF_GENERATE_CPP(
   CODEFS_SRCS
@@ -110,9 +109,6 @@ add_library(
   src/base/FileUtils.hpp
   src/base/FileUtils.cpp
 
-  src/base/FuseAdapter.hpp
-  src/base/FuseAdapter.cpp
-
   src/base/BiDirectionalRpc.hpp
   src/base/BiDirectionalRpc.cpp
   
@@ -129,11 +125,15 @@ add_dependencies(
   generated-code
 )
 
+IF(BUILD_CLIENT)
 add_executable (
   codefs
 
   src/client/Client.hpp
   src/client/Client.cpp
+
+  src/client/FuseAdapter.hpp
+  src/client/FuseAdapter.cpp
 
   src/client/ClientFuseAdapter.hpp
   src/client/ClientFuseAdapter.cpp
@@ -152,8 +152,8 @@ target_link_libraries (
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
   ${FUSE_LIBRARIES}
-  ${fswatch_LIBRARIES}
 )
+ENDIF(BUILD_CLIENT)
 
 add_executable (
   codefsserver
@@ -176,7 +176,6 @@ target_link_libraries (
   ${GFLAGS_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
-  ${FUSE_LIBRARIES}
   ${fswatch_LIBRARIES}
 )
 

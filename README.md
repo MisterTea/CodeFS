@@ -40,6 +40,7 @@ First install the dependencies (either from a package manager or source):
 3. GFlags
 4. ZeroMQ
 5. fswatch
+6. FUSE (or OSXFUSE for mac) for the client.  Build with -DBUILD_CLIENT=OFF to skip the client if you cannot install FUSE on the server.
 
 Then:
 
