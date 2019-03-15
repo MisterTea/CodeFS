@@ -26,7 +26,8 @@ class Client {
     rpc->heartbeat();
   }
 
-  int open(const string& path, int flags, mode_t mode);
+  int open(const string& path, int flags);
+  int create(const string& path, int flags, mode_t mode);
   int close(const string& path, int fd);
   int pread(const string& path, char* buf, int size, int offset);
   int pwrite(const string& path, const char* buf, int size, int offset);

@@ -37,6 +37,65 @@ int Server::update() {
     LOG(INFO) << "CONSUMING REQUEST: " << id.str() << ": " << int(header) << " "
               << payload.size();
     switch (header) {
+      case CLIENT_SERVER_CREATE_FILE: {
+        string path = reader.readPrimitive<string>();
+        int flags = reader.readPrimitive<int>();
+        int mode = reader.readPrimitive<int>();
+        int readWriteMode = (flags & O_ACCMODE);
+        LOG(INFO) << "REQUESTING FILE: " << path << " FLAGS: " << flags << " "
+                  << readWriteMode << " " << mode;
+        optional<FileData> fileData = fileSystem->getNode(path);
+
+        writer.start();
+
+        bool access = true;
+        if (readWriteMode == O_RDONLY) {
+          if (!fileData) {
+            writer.writePrimitive<int>(ENOENT);
+            access = false;
+          } else if (!fileData->can_read()) {
+            writer.writePrimitive<int>(EACCES);
+            access = false;
+          }
+        } else {
+          if (!fileData) {
+            LOG(INFO) << "FILE DOES NOT EXIST YET";
+
+            // Get the parent path and make sure we can write there
+            string parentPath =
+                boost::filesystem::path(path).parent_path().string();
+            LOG(INFO) << "PARENT PATH: " << parentPath;
+            if (parentPath != string("/")) {
+              optional<FileData> parentFileData =
+                  fileSystem->getNode(parentPath);
+              if (!parentFileData || !parentFileData->can_execute()) {
+                writer.writePrimitive<int>(EACCES);
+                access = false;
+              }
+            }
+
+            if (access) {
+              LOG(INFO) << "Creating empty file";
+              fileSystem->writeFile(path, "");
+              fileSystem->chmod(path, mode_t(mode));
+            }
+          } else if (!fileData->can_write()) {
+            writer.writePrimitive<int>(EACCES);
+            access = false;
+          }
+        }
+
+        if (access) {
+          clientLockedPaths.insert(path);
+          writer.writePrimitive<int>(0);
+        }
+        reply(id, writer.finish());
+        if (readWriteMode != O_RDONLY) {
+          fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
+        }
+
+      }
+      break;
       case CLIENT_SERVER_REQUEST_FILE: {
         string path = reader.readPrimitive<string>();
         int flags = reader.readPrimitive<int>();
@@ -61,23 +120,9 @@ int Server::update() {
         } else {
           if (!fileData) {
             LOG(INFO) << "FILE DOES NOT EXIST YET";
-            // Get the parent path and make sure we can write there
-            string parentPath =
-                boost::filesystem::path(path).parent_path().string();
-            LOG(INFO) << "PARENT PATH: " << parentPath;
-            if (parentPath != string("/")) {
-              optional<FileData> parentFileData =
-                  fileSystem->getNode(parentPath);
-              if (!parentFileData || !parentFileData->can_execute()) {
-                writer.writePrimitive<int>(EACCES);
-                writer.writePrimitive<string>("");
-                access = false;
-              }
-            }
-
-            if (access) {
-              fileSystem->writeFile(path, "");
-            }
+            writer.writePrimitive<int>(ENOENT);
+            writer.writePrimitive<string>("");
+            access = false;
           } else if (!fileData->can_write()) {
             writer.writePrimitive<int>(EACCES);
             writer.writePrimitive<string>("");
@@ -101,7 +146,8 @@ int Server::update() {
         if (readWriteMode != O_RDONLY) {
           fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
         }
-      } break;
+      }
+      break;
       case CLIENT_SERVER_RETURN_FILE: {
         string path = reader.readPrimitive<string>();
         bool readOnly = reader.readPrimitive<bool>();
@@ -128,11 +174,16 @@ int Server::update() {
         }
       } break;
       case CLIENT_SERVER_INIT: {
+        static bool init=false;
         LOG(INFO) << "INITIALIZING";
         writer.start();
-        writer.writePrimitive<int>(fileSystem->allFileData.size());
-        for (auto &it : fileSystem->allFileData) {
-          writer.writeProto(it.second);
+        writer.writePrimitive<bool>(init);
+        if (!init) {
+          init = true;
+          writer.writePrimitive<int>(fileSystem->allFileData.size());
+          for (auto &it : fileSystem->allFileData) {
+            writer.writeProto(it.second);
+          }
         }
         reply(id, writer.finish());
         LOG(INFO) << "REPLY SENT";

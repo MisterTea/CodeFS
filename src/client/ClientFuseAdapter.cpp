@@ -100,7 +100,7 @@ static int codefs_ftruncate(const char *path, off_t size,
 
 static int codefs_create(const char *path, mode_t mode,
                          struct fuse_file_info *fi) {
-  int fd = client->open(path, fi->flags, mode);
+  int fd = client->create(path, fi->flags, mode);
   if (fd == -1) return -errno;
   fi->fh = fd;
   LOG(INFO) << "CREATING FD " << fi->fh << " FOR PATH " << path;
@@ -110,15 +110,18 @@ static int codefs_create(const char *path, mode_t mode,
 }
 
 static int codefs_open(const char *path, struct fuse_file_info *fi) {
-  int modes = 0;
+  if (fi->flags & O_CREAT) {
+    LOG(FATAL) << "GOT O_CREAT BUT NO MODE";
+  }
+  int openModes = 0;
   int readWriteMode = (fi->flags & O_ACCMODE);
   if (readWriteMode == O_RDONLY) {
     // The file is opened in read-only mode
-    modes++;
+    openModes++;
   }
   if (readWriteMode == O_WRONLY) {
     // The file is opened in write-only mode.
-    modes++;
+    openModes++;
     if (fi->flags & O_APPEND) {
       // We need to get the file from the server to append
       LOG(FATAL) << "APPEND NOT SUPPORTED YET";
@@ -126,12 +129,12 @@ static int codefs_open(const char *path, struct fuse_file_info *fi) {
   }
   if (readWriteMode == O_RDWR) {
     // The file is opened in read-write mode.
-    modes++;
+    openModes++;
   }
-  if (modes != 1) {
-    LOG(FATAL) << "Invalid open modes: " << fi->flags;
+  if (openModes != 1) {
+    LOG(FATAL) << "Invalid open openModes: " << fi->flags;
   }
-  int fd = client->open(path, fi->flags, readWriteMode);
+  int fd = client->open(path, fi->flags);
   if (fd == -1) return -errno;
 
   fi->fh = fd;

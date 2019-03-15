@@ -33,6 +33,7 @@ int ServerFileSystem::writeFile(const string& path,
     bytesWritten += written;
   }
   ::fclose(fp);
+  rescanPath(relativeToAbsolute(path));
   return 0;
 }
 

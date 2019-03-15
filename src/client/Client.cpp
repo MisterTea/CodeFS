@@ -21,6 +21,11 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
       if (rpc->hasIncomingReplyWithId(initId)) {
         string payload = rpc->consumeIncomingReplyWithId(initId);
         reader.load(payload);
+        bool serverAlreadyRunning = reader.readPrimitive<bool>();
+        if (serverAlreadyRunning) {
+          cout << "The server is already serving a client.  Restart the server if you want to begin a new session" << endl;
+          LOG(FATAL) << "The server is already serving a client.  Restart the server if you want to begin a new session" << endl;
+        }
         int numFileData = reader.readPrimitive<int>();
         vector<FileData> allFileData;
         allFileData.reserve(numFileData);
@@ -69,8 +74,9 @@ int Client::update() {
   return 0;
 }
 
-int Client::open(const string& path, int flags, mode_t mode) {
-  bool readOnly = (mode == O_RDONLY);
+int Client::open(const string& path, int flags) {
+  int readWriteMode = (flags & O_ACCMODE);
+  bool readOnly = (readWriteMode == O_RDONLY);
   LOG(INFO) << "Reading file " << path << " (readonly? " << readOnly << ")";
   int fd = fdCounter++;
 
@@ -119,6 +125,52 @@ int Client::open(const string& path, int flags, mode_t mode) {
   }
   return fd;
 }
+
+int Client::create(const string& path, int flags, mode_t mode) {
+  int readWriteMode = (flags & O_ACCMODE);
+  bool readOnly = (readWriteMode == O_RDONLY);
+  LOG(INFO) << "Creating file " << path << " (readonly? " << readOnly << ")";
+  int fd = fdCounter++;
+
+  if (ownedFileContents.find(path) == ownedFileContents.end()) {
+    if (!readOnly) {
+      fileSystem->invalidatePathAndParent(path);
+    }
+
+    auto cachedData = fileSystem->getCachedFile(path);
+    if (cachedData) {
+      LOG(FATAL) << "TRIED TO CREATE A FILE THAT IS CACHED";
+    } else {
+      string payload;
+      {
+        lock_guard<std::recursive_mutex> lock(rpcMutex);
+        writer.start();
+        writer.writePrimitive<unsigned char>(CLIENT_SERVER_CREATE_FILE);
+        writer.writePrimitive<string>(path);
+        writer.writePrimitive<int>(flags);
+        writer.writePrimitive<int>(mode);
+        payload = writer.finish();
+      }
+      string result = fileRpc(payload);
+      {
+        lock_guard<std::recursive_mutex> lock(rpcMutex);
+        reader.load(result);
+        int rpcErrno = reader.readPrimitive<int>();
+        if (rpcErrno) {
+          errno = rpcErrno;
+          return -1;
+        }
+        LOG(INFO) << "CREATED FILE: " << path;
+        ownedFileContents.insert(
+            make_pair(path, OwnedFileInfo(fd, "", readOnly)));
+      }
+    }
+  } else {
+    LOG(FATAL) << "Tried to create a file that is already owned!";
+  }
+  return fd;
+}
+
 int Client::close(const string& path, int fd) {
   auto& ownedFile = ownedFileContents.at(path);
   if (ownedFile.fds.find(fd) == ownedFile.fds.end()) {

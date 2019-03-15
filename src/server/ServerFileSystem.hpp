@@ -96,35 +96,47 @@ class ServerFileSystem : public FileSystem {
 
   int chmod(const string &path, mode_t mode) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    return ::chmod(relativeToAbsolute(path).c_str(), mode);
+    int res = ::chmod(relativeToAbsolute(path).c_str(), mode);
+    rescanPath(relativeToAbsolute(path));
+    return res;
   }
 
   int lchown(const string &path, int64_t uid, int64_t gid) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    return ::lchown(relativeToAbsolute(path).c_str(), uid, gid);
+    int res = ::lchown(relativeToAbsolute(path).c_str(), uid, gid);
+    rescanPath(relativeToAbsolute(path));
+    return res;
   }
 
   int truncate(const string &path, int64_t size) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    return ::truncate(relativeToAbsolute(path).c_str(), size);
+    int res = ::truncate(relativeToAbsolute(path).c_str(), size);
+    rescanPath(relativeToAbsolute(path));
+    return res;
   }
 
   int utimensat(const string &path, struct timespec ts[2]) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    return ::utimensat(0, relativeToAbsolute(path).c_str(), ts,
+    int res = ::utimensat(0, relativeToAbsolute(path).c_str(), ts,
                        AT_SYMLINK_NOFOLLOW);
+    rescanPath(relativeToAbsolute(path));
+    return res;
   }
 
   int lremovexattr(const string &path, const string &name) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    return ::lremovexattr(relativeToAbsolute(path).c_str(), name.c_str());
+    int res = ::lremovexattr(relativeToAbsolute(path).c_str(), name.c_str());
+    rescanPath(relativeToAbsolute(path));
+    return res;
   }
 
   int lsetxattr(const string &path, const string &name, const string &value,
                 int64_t size, int flags) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    return ::lsetxattr(relativeToAbsolute(path).c_str(), name.c_str(),
+    int res = ::lsetxattr(relativeToAbsolute(path).c_str(), name.c_str(),
                        value.c_str(), size, flags);
+    rescanPath(relativeToAbsolute(path));
+    return res;
   }
 
   void scanRecursively(const string &path,

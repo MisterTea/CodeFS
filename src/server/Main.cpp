@@ -104,15 +104,16 @@ int main(int argc, char *argv[]) {
   shared_ptr<ServerFileSystem> fileSystem(new ServerFileSystem(FLAGS_path));
   shared_ptr<Server> server(new Server(
       string("tcp://") + "0.0.0.0" + ":" + to_string(FLAGS_port), fileSystem));
-  fileSystem->setHandler(server.get());
-  server->init();
-  usleep(100 * 1000);
 
   globalFileSystem = fileSystem;
   shared_ptr<thread> watchThread(new thread(runFsWatch));
   usleep(100 * 1000);
 
   fileSystem->init();
+
+  fileSystem->setHandler(server.get());
+  server->init();
+  usleep(100 * 1000);
 
   int counter = 0;
   while (true) {

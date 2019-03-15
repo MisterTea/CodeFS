@@ -13,10 +13,73 @@ There are already several approaches for this, here is a breakdown of their pros
 | rmate/nuclide                 | Fast, easy to use       | Requires IDE plugins               |
 | ssh + console ide (vim/emacs) | Needs no extra software | Lag when editing                   |
 
+
 CodeFS brings the POSIX interface of sshfs with the speed that comes with a dedicated server.
 
 # Current State
 
 CodeFS is in alpha testing.  You should only use this on directories that are source controlled and you should git push often.
 
+# How to install
+
+## OS/X
+
+Use homebrew:
+
+```
+brew cask install osxfuse
+brew install --HEAD MisterTea/codefs/codefs
+```
+
+## Building from Source
+
+First install the dependencies (either from a package manager or source):
+
+1. Boost
+2. Protobuf
+3. GFlags
+4. ZeroMQ
+5. fswatch
+
+Then:
+
+```
+git clone https://github.com/MisterTea/CodeFS.git
+cd CodeFS
+mkdir build
+cd build
+cmake ../
+make -j4
+make install
+```
+
+# User Guide
+
+## Starting the server
+
+Note that, as of now, there is **no** security or encryption.  This means that port 2298 should **not** be exposed to the outside.  Instead, codefs should be run over a secure layer, such as Eternal Terminal: https://github.com/MisterTea/EternalTerminal
+
+To connect to the server with port forwarding:
+
+```
+et -x -t=2298:2298 my_server.com
+```
+
+Then inside the et/ssh session, run:
+
+```
+codefsserver --path=/my/code/path
+```
+
+Where ```/my/code/path``` is the location of your code.  For now, the server needs to be restarted every time the client (re)connects.
+
+## Running the client
+
+On the client, run:
+
+```
+codefs --path=/tmp/my_development_path
+```
+
+Where ```/tmp/my_development_path``` is some empty folder that you will populate with the server files.
 

@@ -76,6 +76,17 @@ int main(int argc, char *argv[]) {
   // Reconfigure default logger to apply settings above
   el::Loggers::reconfigureLogger("default", defaultConf);
 
+  // Create mountpoint if it doesn't exist
+  boost::filesystem::path pt(FLAGS_mountpoint);
+  if (!exists(pt)) {
+    boost::filesystem::create_directory(pt);
+  } else {
+    if (!boost::filesystem::is_directory(pt)) {
+      cout << "Error: The mountpoint is not a directory" << endl;
+      LOG(FATAL) << "The mountpoint is not a directory";
+    }
+  }
+
   shared_ptr<ClientFileSystem> fileSystem(
       new ClientFileSystem(FLAGS_mountpoint));
   shared_ptr<Client> client(new Client(

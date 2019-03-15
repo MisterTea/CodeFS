@@ -76,6 +76,6 @@ void ZmqBiDirectionalRpc::send(const string& message) {
     LOG(FATAL) << "Invalid message size";
   }
   zmq::message_t zmqMessage(message.c_str(), message.length());
-  FATAL_IF_FALSE(socket->send(zmqMessage));
+  FATAL_IF_FALSE_NOT_EAGAIN(socket->send(zmqMessage, ZMQ_DONTWAIT));
 }
 }  // namespace codefs
