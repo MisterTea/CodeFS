@@ -14,21 +14,25 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
 
   while (true) {
     LOG(INFO) << "Waiting for init...";
-    rpc->update();
-    rpc->heartbeat();
-    if (rpc->hasIncomingReplyWithId(initId)) {
-      string payload = rpc->consumeIncomingReplyWithId(initId);
-      reader.load(payload);
-      int numFileData = reader.readPrimitive<int>();
-      vector<FileData> allFileData;
-      allFileData.reserve(numFileData);
-      LOG(INFO) << "GOT NUM FILE DATA: " << numFileData << endl;
-      for (int a = 0; a < numFileData; a++) {
-        allFileData.push_back(reader.readProto<FileData>());
-        LOG(INFO) << "GOT FILE DATA WITH PATH: " << allFileData.back().path();
+    {
+      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      rpc->update();
+      rpc->heartbeat();
+      if (rpc->hasIncomingReplyWithId(initId)) {
+        string payload = rpc->consumeIncomingReplyWithId(initId);
+        reader.load(payload);
+        int numFileData = reader.readPrimitive<int>();
+        vector<FileData> allFileData;
+        allFileData.reserve(numFileData);
+        // LOG(INFO) << "GOT NUM FILE DATA: " << numFileData << endl;
+        for (int a = 0; a < numFileData; a++) {
+          allFileData.push_back(reader.readProto<FileData>());
+          // LOG(INFO) << "GOT FILE DATA WITH PATH: " <<
+          // allFileData.back().path();
+        }
+        fileSystem->init(allFileData);
+        break;
       }
-      fileSystem->init(allFileData);
-      break;
     }
     sleep(1);
   }
@@ -493,7 +497,7 @@ string Client::fileRpc(const string& payload) {
     id = rpc->request(payload);
   }
   while (true) {
-    usleep(100);
+    usleep(1000);
     {
       lock_guard<std::recursive_mutex> lock(rpcMutex);
       if (rpc->hasIncomingReplyWithId(id)) {

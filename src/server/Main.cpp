@@ -17,15 +17,12 @@ namespace codefs {
 void runFsWatch() {
   fsw::FSW_EVENT_CALLBACK *cb = [](const std::vector<fsw::event> &events,
                                    void *context) {
-    cout << "GOT EVENT: " << events.size() << endl;
     for (const auto &it : events) {
       if (it.get_path().find(FLAGS_path) != 0) {
         LOG(ERROR) << "FSWatch event on invalid path: " << it.get_path();
         continue;
       }
-      cout << it.get_path() << " " << it.get_time() << " (";
       for (const auto &it2 : it.get_flags()) {
-        cout << fsw_get_event_flag_name(it2) << ", ";
         switch (it2) {
           case NoOp:
             break;
@@ -33,6 +30,8 @@ void runFsWatch() {
           case Link:
           case OwnerModified:
           case AttributeModified:
+            LOG(INFO) << it.get_path() << " " << it.get_time()
+                      << fsw_get_event_flag_name(it2);
             globalFileSystem->rescanPathAndParent(it.get_path());
             break;
           case Removed:
@@ -40,6 +39,8 @@ void runFsWatch() {
           case MovedFrom:
           case MovedTo:
           case Created:
+            LOG(INFO) << it.get_path() << " " << it.get_time()
+                      << fsw_get_event_flag_name(it2);
             globalFileSystem->rescanPathAndParentAndChildren(it.get_path());
             break;
           case IsFile:
@@ -53,7 +54,6 @@ void runFsWatch() {
             LOG(FATAL) << "Unhandled flag " << it2;
         }
       }
-      cout << ")" << endl;
     }
   };
 

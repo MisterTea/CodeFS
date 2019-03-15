@@ -25,19 +25,20 @@ void runFuse(char *binaryLocation, shared_ptr<Client> client,
   int argc;
   char **argv;
   if (FLAGS_logtostdout) {
-    argc = 4;
+    argc = 5;
     const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-d",
-                                "-s"};
+                                "-s", "-odaemon_timeout=2592000"};
     argv = (char **)const_argv;
   } else {
-    argc = 3;
-    const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-s"};
+    argc = 5;
+    const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-f",
+                                "-s", "-odaemon_timeout=2592000"};
     argv = (char **)const_argv;
   }
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
   if (fuse_opt_parse(&args, &loopback, codefs_opts, NULL) == -1) {
-    exit(1);
+    LOG(FATAL) << "Error parsing fuse options";
   }
 
   umask(0);
@@ -96,6 +97,7 @@ int main(int argc, char *argv[]) {
     }
     usleep(1000);
   }
+  LOG(INFO) << "Client finished";
 }
 }  // namespace codefs
 
