@@ -41,7 +41,7 @@ class FileSystem {
           LOG(INFO) << path << " is invalid, waiting for new version";
         }
       }
-      usleep(1000);
+      usleep(100 * 1000);
     }
   }
 
@@ -100,11 +100,14 @@ class FileSystem {
       // The node is deleted, Don't add
       LOG(INFO) << fileData.path() << " was deleted!";
     } else {
+      if (fileData.invalid()) {
+        LOG(INFO) << "INVALIDAING " << fileData.path();
+      }
       allFileData.insert(make_pair(fileData.path(), fileData));
     }
   }
 
-  void createStub(const string& path) {
+  void createStub(const string &path) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     FileData stub;
     stub.set_path(path);
@@ -112,7 +115,7 @@ class FileSystem {
     setNode(stub);
   }
 
-  void deleteNode(const string& path) {
+  void deleteNode(const string &path) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     auto it = allFileData.find(path);
     if (it != allFileData.end()) {

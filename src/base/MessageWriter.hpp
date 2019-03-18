@@ -38,6 +38,13 @@ class MessageWriter {
     writePrimitive<string>(s);
   }
 
+  template <typename T>
+  inline void writeProtoCompressed(const T& t) {
+    string s;
+    t.SerializeToString(&s);
+    writePrimitive<string>(compressString(s));
+  }
+
   inline string finish() {
     string s(buffer.data(), buffer.size());
     start();

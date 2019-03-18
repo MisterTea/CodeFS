@@ -45,6 +45,7 @@ find_package(ZeroMQ REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem)
 find_package(fswatch REQUIRED)
+find_package(ZLIB REQUIRED)
 
 IF(BUILD_CLIENT)
 IF(APPLE)
@@ -88,6 +89,7 @@ include_directories(
   ${Boost_INCLUDE_DIRS}
   ${ZMQ_INCLUDE_DIRS}
   ${fswatch_INCLUDE_DIRS}
+  ${ZLIB_INCLUDE_DIRS}
   )
 
 add_library(
@@ -152,6 +154,7 @@ target_link_libraries (
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
   ${FUSE_LIBRARIES}
+  ${ZLIB_LIBRARY_RELEASE}
 )
 ENDIF(BUILD_CLIENT)
 
@@ -176,6 +179,7 @@ target_link_libraries (
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
   ${fswatch_LIBRARIES}
+  ${ZLIB_LIBRARY_RELEASE}
 )
 
 if(BUILD_TEST) # Build unit tests.
@@ -211,6 +215,8 @@ if(BUILD_TEST) # Build unit tests.
     ${GFLAGS_LIBRARIES}
     ${sodium_LIBRARY_RELEASE}
     ${Boost_LIBRARIES}
+    ${ZLIB_LIBRARIES}
+    ${ZLIB_LIBRARY_RELEASE}
     resolv
     util
     )

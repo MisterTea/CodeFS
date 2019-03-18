@@ -68,3 +68,7 @@ message FileData {
   optional bool deleted = 10;
   optional bool invalid = 11;
 }
+
+message FileDataBatch {
+  repeated FileData file_data = 1;
+}

@@ -23,17 +23,18 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
         reader.load(payload);
         bool serverAlreadyRunning = reader.readPrimitive<bool>();
         if (serverAlreadyRunning) {
-          cout << "The server is already serving a client.  Restart the server if you want to begin a new session" << endl;
-          LOG(FATAL) << "The server is already serving a client.  Restart the server if you want to begin a new session" << endl;
+          cout << "The server is already serving a client.  Restart the server "
+                  "if you want to begin a new session"
+               << endl;
+          LOG(FATAL) << "The server is already serving a client.  Restart the "
+                        "server if you want to begin a new session"
+                     << endl;
         }
-        int numFileData = reader.readPrimitive<int>();
+        FileDataBatch allFileDataProto =
+            reader.readProtoCompressed<FileDataBatch>();
         vector<FileData> allFileData;
-        allFileData.reserve(numFileData);
-        // LOG(INFO) << "GOT NUM FILE DATA: " << numFileData << endl;
-        for (int a = 0; a < numFileData; a++) {
-          allFileData.push_back(reader.readProto<FileData>());
-          // LOG(INFO) << "GOT FILE DATA WITH PATH: " <<
-          // allFileData.back().path();
+        for (int a = 0; a < allFileDataProto.file_data_size(); a++) {
+          allFileData.push_back(allFileDataProto.file_data(a));
         }
         fileSystem->init(allFileData);
         break;
@@ -58,6 +59,9 @@ int Client::update() {
         string path = reader.readPrimitive<string>();
         LOG(INFO) << "UPDATING PATH: " << path;
         FileData fileData = reader.readProto<FileData>();
+        if (fileData.invalid()) {
+          LOG(FATAL) << "Got filedata with invalid set";
+        }
         if (path != fileData.path()) {
           LOG(FATAL) << "PATH MISMATCH: " << path << " != " << fileData.path();
         }
@@ -109,7 +113,7 @@ int Client::open(const string& path, int flags) {
           errno = rpcErrno;
           return -1;
         }
-        string fileContents = reader.readPrimitive<string>();
+        string fileContents = decompressString(reader.readPrimitive<string>());
         LOG(INFO) << "READ FILE: " << path << " WITH CONTENTS SIZE "
                   << fileContents.size();
         ownedFileContents.insert(
@@ -195,7 +199,7 @@ int Client::close(const string& path, int fd) {
     if (ownedFile.readOnly) {
       LOG(INFO) << "RETURNED FILE " << path << " TO SERVER READ-ONLY";
     } else {
-      writer.writePrimitive<string>(ownedFile.content);
+      writer.writePrimitive<string>(compressString(ownedFile.content));
       LOG(INFO) << "RETURNED FILE " << path << " TO SERVER WITH "
                 << ownedFile.content.size() << " BYTES";
     }

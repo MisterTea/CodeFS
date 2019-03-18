@@ -92,8 +92,7 @@ int Server::update() {
         reply(id, writer.finish());
         fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
 
-      }
-      break;
+      } break;
       case CLIENT_SERVER_REQUEST_FILE: {
         string path = reader.readPrimitive<string>();
         int flags = reader.readPrimitive<int>();
@@ -138,14 +137,13 @@ int Server::update() {
 
           clientLockedPaths.insert(path);
           writer.writePrimitive<int>(0);
-          writer.writePrimitive<string>(fileContents);
+          writer.writePrimitive<string>(compressString(fileContents));
         }
         reply(id, writer.finish());
         if (readWriteMode != O_RDONLY) {
           fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
         }
-      }
-      break;
+      } break;
       case CLIENT_SERVER_RETURN_FILE: {
         string path = reader.readPrimitive<string>();
         bool readOnly = reader.readPrimitive<bool>();
@@ -153,7 +151,8 @@ int Server::update() {
         if (readOnly) {
           LOG(INFO) << "RETURNED READ-ONLY FILE";
         } else {
-          string fileContents = reader.readPrimitive<string>();
+          string fileContents =
+              decompressString(reader.readPrimitive<string>());
           LOG(INFO) << "WRITING FILE " << path << " " << fileContents.size();
 
           res = fileSystem->writeFile(path, fileContents);
@@ -172,16 +171,17 @@ int Server::update() {
         }
       } break;
       case CLIENT_SERVER_INIT: {
-        static bool init=false;
+        static bool init = false;
         LOG(INFO) << "INITIALIZING";
         writer.start();
         writer.writePrimitive<bool>(init);
         if (!init) {
           init = true;
-          writer.writePrimitive<int>(fileSystem->allFileData.size());
+          FileDataBatch fileDataBatch;
           for (auto &it : fileSystem->allFileData) {
-            writer.writeProto(it.second);
+            *(fileDataBatch.add_file_data()) = it.second;
           }
+          writer.writeProtoCompressed(fileDataBatch);
         }
         reply(id, writer.finish());
         LOG(INFO) << "REPLY SENT";

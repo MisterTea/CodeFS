@@ -60,6 +60,16 @@ class MessageReader {
     return t;
   }
 
+  template <typename T>
+  inline T readProtoCompressed() {
+    T t;
+    string s = decompressString(readPrimitive<string>());
+    if (!t.ParseFromString(s)) {
+      throw std::runtime_error("Invalid proto");
+    }
+    return t;
+  }
+
   inline int64_t sizeRemaining() {
     // TODO: Make sure this is accurate
     return unpackHandler.nonparsed_size();
@@ -68,6 +78,6 @@ class MessageReader {
  protected:
   msgpack::unpacker unpackHandler;
 };
-}  // namespace wga
+}  // namespace codefs
 
 #endif  // __MESSAGE_READER_H__
