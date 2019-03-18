@@ -69,7 +69,7 @@ et -x -t=2298:2298 my_server.com
 Then inside the et/ssh session, run:
 
 ```
-codefsserver --path=/my/code/path
+codefsserver --path=/my/code/path --logtostdout
 ```
 
 Where ```/my/code/path``` is the location of your code.  For now, the server needs to be restarted every time the client (re)connects.
@@ -79,8 +79,13 @@ Where ```/my/code/path``` is the location of your code.  For now, the server nee
 On the client, run:
 
 ```
-codefs --path=/tmp/my_development_path
+codefs --path=/tmp/my_development_path --logtostdout
 ```
 
-Where ```/tmp/my_development_path``` is some empty folder that you will populate with the server files.
+Where ```/tmp/my_development_path``` is some empty folder that will act like a mirror to the folder on the server.
 
+# Troubleshooting
+
+### Client doesn't connect to server
+
+In 0.0.1, the server needs to finish indexing the entire directory before the client will be able to connect to it.
