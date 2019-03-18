@@ -5,7 +5,6 @@
 
 #include "MessageReader.hpp"
 #include "MessageWriter.hpp"
-#include "Scanner.hpp"
 #include "ServerFileSystem.hpp"
 #include "ZmqBiDirectionalRpc.hpp"
 
@@ -37,7 +36,6 @@ class Server : public ServerFileSystem::Handler {
   int port;
   shared_ptr<ServerFileSystem> fileSystem;
   int clientFd;
-  Scanner scanner;
   recursive_mutex rpcMutex;
   unordered_set<string> clientLockedPaths;
 };

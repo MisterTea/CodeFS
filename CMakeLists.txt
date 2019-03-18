@@ -159,7 +159,6 @@ add_executable (
   codefsserver
 
   src/server/ServerFileSystem.cpp
-  src/server/Scanner.cpp
   src/server/Server.cpp
   src/server/fswatchexample.cpp
 

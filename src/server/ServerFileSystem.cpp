@@ -54,7 +54,7 @@ void ServerFileSystem::scanRecursively(
         string p_str = p.path().string();
         if (boost::filesystem::is_regular_file(p.path()) ||
             boost::filesystem::is_symlink(p.path())) {
-          LOG(INFO) << "SCANNING FILE " << p_str;
+          //LOG(INFO) << "SCANNING FILE " << p_str;
           scanNode(p_str, result);
         } else if (boost::filesystem::is_directory(p.path())) {
           scanRecursively(p_str, result);
@@ -68,7 +68,7 @@ void ServerFileSystem::scanRecursively(
                  << "doesn't exist or isn't a directory!";
     }
   } catch (const boost::filesystem::filesystem_error& ex) {
-    LOG(FATAL) << ex.what();
+    LOG(ERROR) << ex.what();
   }
 
   LOG(INFO) << "RECURSIVE SCAN FINISHED";
@@ -87,33 +87,46 @@ FileData ServerFileSystem::scanNode(const string& path,
 
 #if __APPLE__
   // faccessat doesn't have AT_SYMLINK_NOFOLLOW
+  bool symlinkToDeadFile=false;
   if (::faccessat(0, path.c_str(), F_OK, 0) != 0) {
-    LOG(INFO) << "FILE IS GONE: " << path << " " << errno;
-    // The file is gone
-    result->erase(absoluteToRelative(path));
-    fd.set_deleted(true);
-    if (handler != NULL) {
-      LOG(INFO) << "UPDATING METADATA: " << path;
-      handler->metadataUpdated(absoluteToRelative(path), fd);
+    // The file is gone, but this could be a symlink and the symlink could still be alive.
+
+    if (boost::filesystem::symbolic_link_exists(path)) {
+      symlinkToDeadFile=true;
+    } else {
+      LOG(INFO) << "FILE IS GONE: " << path << " " << errno;
+      result->erase(absoluteToRelative(path));
+      fd.set_deleted(true);
+      if (handler != NULL) {
+        LOG(INFO) << "UPDATING METADATA: " << path;
+        handler->metadataUpdated(absoluteToRelative(path), fd);
+      }
+
+      return fd;
     }
-
-    return fd;
   }
 
-  if (::faccessat(0, path.c_str(), R_OK, 0) == 0) {
+  if (symlinkToDeadFile) {
+    //TODO: Re-implement access().  Until then, clients will think they can edit symlinks when they cant.
     fd.set_can_read(true);
-  } else {
-    fd.set_can_read(false);
-  }
-  if (::faccessat(0, path.c_str(), W_OK, 0) == 0) {
     fd.set_can_write(true);
-  } else {
-    fd.set_can_write(false);
-  }
-  if (::faccessat(0, path.c_str(), X_OK, 0) == 0) {
     fd.set_can_execute(true);
   } else {
-    fd.set_can_execute(false);
+    if (::faccessat(0, path.c_str(), R_OK, 0) == 0) {
+      fd.set_can_read(true);
+    } else {
+      fd.set_can_read(false);
+    }
+    if (::faccessat(0, path.c_str(), W_OK, 0) == 0) {
+      fd.set_can_write(true);
+    } else {
+      fd.set_can_write(false);
+    }
+    if (::faccessat(0, path.c_str(), X_OK, 0) == 0) {
+      fd.set_can_execute(true);
+    } else {
+      fd.set_can_execute(false);
+    }
   }
 #else
   if (::faccessat(0, path.c_str(), F_OK, AT_SYMLINK_NOFOLLOW) != 0) {

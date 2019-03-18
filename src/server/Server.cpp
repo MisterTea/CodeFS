@@ -90,9 +90,7 @@ int Server::update() {
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
-        if (readWriteMode != O_RDONLY) {
-          fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
-        }
+        fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
 
       }
       break;
@@ -229,9 +227,6 @@ int Server::update() {
       } break;
       case CLIENT_SERVER_SYMLINK: {
         string from = reader.readPrimitive<string>();
-        if (from[0] == '/') {
-          from = fileSystem->relativeToAbsolute(from);
-        }
         string to = reader.readPrimitive<string>();
         int res = fileSystem->symlink(from, to);
         writer.writePrimitive<int>(res);

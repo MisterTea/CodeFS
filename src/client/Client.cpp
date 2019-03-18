@@ -151,6 +151,8 @@ int Client::create(const string& path, int flags, mode_t mode) {
         writer.writePrimitive<int>(mode);
         payload = writer.finish();
       }
+      // Create an invalid node until we get the real one
+      fileSystem->createStub(path);
       string result = fileRpc(payload);
       {
         lock_guard<std::recursive_mutex> lock(rpcMutex);
@@ -158,6 +160,7 @@ int Client::create(const string& path, int flags, mode_t mode) {
         int rpcErrno = reader.readPrimitive<int>();
         if (rpcErrno) {
           errno = rpcErrno;
+          fileSystem->deleteNode(path);
           return -1;
         }
         LOG(INFO) << "CREATED FILE: " << path;
@@ -168,6 +171,7 @@ int Client::create(const string& path, int flags, mode_t mode) {
   } else {
     LOG(FATAL) << "Tried to create a file that is already owned!";
   }
+
   return fd;
 }
 
@@ -284,6 +288,7 @@ int Client::rmdir(const string& path) {
 }
 
 int Client::symlink(const string& from, const string& to) {
+  fileSystem->invalidatePathAndParent(from);
   fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_SYMLINK, from, to);
 }
@@ -303,6 +308,7 @@ int Client::rename(const string& from, const string& to) {
 }
 
 int Client::link(const string& from, const string& to) {
+  fileSystem->invalidatePathAndParent(from);
   fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_LINK, from, to);
 }

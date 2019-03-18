@@ -25,6 +25,7 @@ class ServerFileSystem : public FileSystem {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     rescanPath(absolutePath);
     if (absoluteToRelative(absolutePath) != string("/")) {
+      LOG(INFO) << "RESCANNING PARENT";
       rescanPath(boost::filesystem::path(absolutePath).parent_path().string());
     }
   }
@@ -79,7 +80,7 @@ class ServerFileSystem : public FileSystem {
 
   int symlink(const string &from, const string &to) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    return ::symlink(from.c_str(), relativeToAbsolute(to).c_str());
+    return ::symlink(relativeToAbsolute(from).c_str(), relativeToAbsolute(to).c_str());
   }
 
   int link(const string &from, const string &to) {

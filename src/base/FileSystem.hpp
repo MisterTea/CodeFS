@@ -98,8 +98,25 @@ class FileSystem {
     allFileData.erase(fileData.path());
     if (fileData.deleted()) {
       // The node is deleted, Don't add
+      LOG(INFO) << fileData.path() << " was deleted!";
     } else {
       allFileData.insert(make_pair(fileData.path(), fileData));
+    }
+  }
+
+  void createStub(const string& path) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    FileData stub;
+    stub.set_path(path);
+    stub.set_invalid(true);
+    setNode(stub);
+  }
+
+  void deleteNode(const string& path) {
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    auto it = allFileData.find(path);
+    if (it != allFileData.end()) {
+      allFileData.erase(it);
     }
   }
 

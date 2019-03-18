@@ -69,12 +69,6 @@ static int codefs_rename(const char *from, const char *to) {
   return 0;
 }
 
-static int codefs_link(const char *from, const char *to) {
-  int res = client->link(from, to);
-  if (res == -1) return -errno;
-  return 0;
-}
-
 static int codefs_chmod(const char *path, mode_t mode) {
   int res = client->chmod(path, mode);
   if (res == -1) return -errno;
@@ -239,7 +233,7 @@ void ClientFuseAdapter::assignClientCallbacks(
   ops->unlink = codefs_unlink;
   ops->rmdir = codefs_rmdir;
   ops->rename = codefs_rename;
-  ops->link = codefs_link;
+  // ops->link = codefs_link;
   ops->chmod = codefs_chmod;
   ops->chown = codefs_chown;
   ops->truncate = codefs_truncate;

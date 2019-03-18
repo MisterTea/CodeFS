@@ -25,14 +25,14 @@ void runFuse(char *binaryLocation, shared_ptr<Client> client,
   int argc;
   char **argv;
   if (FLAGS_logtostdout) {
-    argc = 5;
+    argc = 6;
     const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-d",
-                                "-s", "-odaemon_timeout=2592000"};
+                                "-s", "-odaemon_timeout=2592000", "-ojail_symlinks"};
     argv = (char **)const_argv;
   } else {
-    argc = 5;
+    argc = 6;
     const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-f",
-                                "-s", "-odaemon_timeout=2592000"};
+                                "-s", "-odaemon_timeout=2592000", "-ojail_symlinks"};
     argv = (char **)const_argv;
   }
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
