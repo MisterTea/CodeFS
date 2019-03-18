@@ -3,7 +3,7 @@ CodeFS is a filesystem for remote software development.
 
 # Why make CodeFS?
 
-Remote development is a key component of software engineering.  Whether developing for embedding devices or building large ML pipelines in the cloud, one often finds oneself needing to work jointly on a local laptop and on a desktop, embedded device, or virtual server.
+Remote development is a key component of software engineering.  Whether developing for embedded devices or building large ML pipelines in the cloud, one often finds oneself needing to work jointly on a local laptop and on a desktop, embedded device, or virtual server.
 
 There are already several approaches for this, here is a breakdown of their pros and cons:
 
@@ -12,9 +12,10 @@ There are already several approaches for this, here is a breakdown of their pros
 | sshfs                         | POSIX interface         | Slow, especially to fetch metadata |
 | rmate/nuclide                 | Fast, easy to use       | Requires IDE plugins               |
 | ssh + console ide (vim/emacs) | Needs no extra software | Lag when editing                   |
+| DropBox/syncthing             | Replicates all files    | Replicates all files               |
 
 
-CodeFS brings the POSIX interface of sshfs with the speed that comes with a dedicated server.
+CodeFS brings the POSIX interface of sshfs with the speed that comes with a dedicated server process.
 
 # Current State
 
