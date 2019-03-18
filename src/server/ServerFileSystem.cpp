@@ -54,7 +54,7 @@ void ServerFileSystem::scanRecursively(
         string p_str = p.path().string();
         if (boost::filesystem::is_regular_file(p.path()) ||
             boost::filesystem::is_symlink(p.path())) {
-          //LOG(INFO) << "SCANNING FILE " << p_str;
+          // LOG(INFO) << "SCANNING FILE " << p_str;
           scanNode(p_str, result);
         } else if (boost::filesystem::is_directory(p.path())) {
           scanRecursively(p_str, result);
@@ -87,12 +87,13 @@ FileData ServerFileSystem::scanNode(const string& path,
 
 #if __APPLE__
   // faccessat doesn't have AT_SYMLINK_NOFOLLOW
-  bool symlinkToDeadFile=false;
+  bool symlinkToDeadFile = false;
   if (::faccessat(0, path.c_str(), F_OK, 0) != 0) {
-    // The file is gone, but this could be a symlink and the symlink could still be alive.
+    // The file is gone, but this could be a symlink and the symlink could still
+    // be alive.
 
     if (boost::filesystem::symbolic_link_exists(path)) {
-      symlinkToDeadFile=true;
+      symlinkToDeadFile = true;
     } else {
       LOG(INFO) << "FILE IS GONE: " << path << " " << errno;
       result->erase(absoluteToRelative(path));
@@ -107,7 +108,8 @@ FileData ServerFileSystem::scanNode(const string& path,
   }
 
   if (symlinkToDeadFile) {
-    //TODO: Re-implement access().  Until then, clients will think they can edit symlinks when they cant.
+    // TODO: Re-implement access().  Until then, clients will think they can
+    // edit symlinks when they cant.
     fd.set_can_read(true);
     fd.set_can_write(true);
     fd.set_can_execute(true);
@@ -190,7 +192,6 @@ FileData ServerFileSystem::scanNode(const string& path,
     // Populate children
     for (auto& it : boost::make_iterator_range(
              boost::filesystem::directory_iterator(path), {})) {
-      LOG(INFO) << "FOUND CHILD: " << it.path().filename().string();
       fd.add_child_node(it.path().filename().string());
     }
   }
