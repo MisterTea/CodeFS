@@ -3,7 +3,7 @@ CodeFS is a filesystem for remote software development.
 
 # Why make CodeFS?
 
-Remote development is a key component of software engineering.  Whether developing for embedding devices or building large ML pipelines in the cloud, one often finds oneself needing to work jointly on a local laptop and on a desktop, embedded device, or virtual server.
+Remote development is a key component of software engineering.  Whether developing for embedded devices or building large ML pipelines in the cloud, one often finds oneself needing to work jointly on a local laptop and on a desktop, embedded device, or virtual server.
 
 There are already several approaches for this, here is a breakdown of their pros and cons:
 
@@ -12,9 +12,10 @@ There are already several approaches for this, here is a breakdown of their pros
 | sshfs                         | POSIX interface         | Slow, especially to fetch metadata |
 | rmate/nuclide                 | Fast, easy to use       | Requires IDE plugins               |
 | ssh + console ide (vim/emacs) | Needs no extra software | Lag when editing                   |
+| DropBox/syncthing             | Replicates all files    | Replicates all files               |
 
 
-CodeFS brings the POSIX interface of sshfs with the speed that comes with a dedicated server.
+CodeFS brings the POSIX interface of sshfs with the speed that comes with a dedicated server process.
 
 # Current State
 
@@ -69,7 +70,7 @@ et -x -t=2298:2298 my_server.com
 Then inside the et/ssh session, run:
 
 ```
-codefsserver --path=/my/code/path
+codefsserver --path=/my/code/path --logtostdout
 ```
 
 Where ```/my/code/path``` is the location of your code.  For now, the server needs to be restarted every time the client (re)connects.
@@ -79,8 +80,13 @@ Where ```/my/code/path``` is the location of your code.  For now, the server nee
 On the client, run:
 
 ```
-codefs --path=/tmp/my_development_path
+codefs --path=/tmp/my_development_path --logtostdout
 ```
 
-Where ```/tmp/my_development_path``` is some empty folder that you will populate with the server files.
+Where ```/tmp/my_development_path``` is some empty folder that will act like a mirror to the folder on the server.
 
+# Troubleshooting
+
+### Client doesn't connect to server
+
+In 0.0.1, the server needs to finish indexing the entire directory before the client will be able to connect to it.
