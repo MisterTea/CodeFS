@@ -46,7 +46,7 @@ First install the dependencies (either from a package manager or source):
 Then:
 
 ```
-git clone https://github.com/MisterTea/CodeFS.git
+git clone https://github.com/MisterTea/CodeFS.git --recurse-submodules
 cd CodeFS
 mkdir build
 cd build
