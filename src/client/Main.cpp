@@ -22,20 +22,23 @@ static const struct fuse_opt codefs_opts[] = {
 
 void runFuse(char *binaryLocation, shared_ptr<Client> client,
              shared_ptr<ClientFileSystem> fileSystem) {
-  int argc;
-  char **argv;
+  vector<string> fuseFlags = {binaryLocation, FLAGS_mountpoint.c_str(), "-s",
+                              "-ojail_symlinks"};
+#if __APPLE__
+  // OSXFUSE has a timeout in the kernel.  Because we can block on network
+  // failure, we disable this timeout
+  fuseFlags.push_back("-odaemon_timeout=2592000");
+#endif
   if (FLAGS_logtostdout) {
-    argc = 6;
-    const char *const_argv[] = {
-        binaryLocation, FLAGS_mountpoint.c_str(),   "-d",
-        "-s",           "-odaemon_timeout=2592000", "-ojail_symlinks"};
-    argv = (char **)const_argv;
+    fuseFlags.push_back("-d");
   } else {
-    argc = 6;
-    const char *const_argv[] = {
-        binaryLocation, FLAGS_mountpoint.c_str(),   "-f",
-        "-s",           "-odaemon_timeout=2592000", "-ojail_symlinks"};
-    argv = (char **)const_argv;
+    fuseFlags.push_back("-f");
+  }
+
+  int argc = int(fuseFlags.size());
+  char **argv = new char *[argc];
+  for (int a = 0; a < argc; a++) {
+    argv[a] = &(fuseFlags[a][0]);
   }
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
@@ -58,7 +61,7 @@ void runFuse(char *binaryLocation, shared_ptr<Client> client,
   } else {
     LOG(INFO) << "FUSE THREAD EXIT";
   }
-}
+}  // namespace codefs
 
 int main(int argc, char *argv[]) {
   GOOGLE_PROTOBUF_VERIFY_VERSION;
