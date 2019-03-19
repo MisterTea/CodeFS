@@ -46,7 +46,7 @@ First install the dependencies (either from a package manager or source):
 Then:
 
 ```
-git clone https://github.com/MisterTea/CodeFS.git
+git clone https://github.com/MisterTea/CodeFS.git --recurse-submodules
 cd CodeFS
 mkdir build
 cd build
@@ -64,7 +64,7 @@ Note that, as of now, there is **no** security or encryption.  This means that p
 To connect to the server with port forwarding:
 
 ```
-et -x -t=2298:2298 my_server.com
+et -x -t="2298:2298" my_server.com
 ```
 
 Then inside the et/ssh session, run:
