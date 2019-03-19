@@ -22,12 +22,12 @@ static const struct fuse_opt codefs_opts[] = {
 
 void runFuse(char *binaryLocation, shared_ptr<Client> client,
              shared_ptr<ClientFileSystem> fileSystem) {
-  vector<string> fuseFlags = {binaryLocation, FLAGS_mountpoint.c_str(), "-s",
-                              "-ojail_symlinks"};
+  vector<string> fuseFlags = {binaryLocation, FLAGS_mountpoint.c_str(), "-s"};
 #if __APPLE__
   // OSXFUSE has a timeout in the kernel.  Because we can block on network
   // failure, we disable this timeout
   fuseFlags.push_back("-odaemon_timeout=2592000");
+  fuseFlags.push_back("-ojail_symlinks");
 #endif
   if (FLAGS_logtostdout) {
     fuseFlags.push_back("-d");
