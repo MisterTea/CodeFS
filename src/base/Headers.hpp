@@ -57,6 +57,7 @@ extern "C" {
 #include <deque>
 #include <exception>
 #include <fstream>
+#include <future>
 #include <iostream>
 #include <memory>
 #include <mutex>

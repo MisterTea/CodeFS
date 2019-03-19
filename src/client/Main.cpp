@@ -26,13 +26,15 @@ void runFuse(char *binaryLocation, shared_ptr<Client> client,
   char **argv;
   if (FLAGS_logtostdout) {
     argc = 6;
-    const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-d",
-                                "-s", "-odaemon_timeout=2592000", "-ojail_symlinks"};
+    const char *const_argv[] = {
+        binaryLocation, FLAGS_mountpoint.c_str(),   "-d",
+        "-s",           "-odaemon_timeout=2592000", "-ojail_symlinks"};
     argv = (char **)const_argv;
   } else {
     argc = 6;
-    const char *const_argv[] = {binaryLocation, FLAGS_mountpoint.c_str(), "-f",
-                                "-s", "-odaemon_timeout=2592000", "-ojail_symlinks"};
+    const char *const_argv[] = {
+        binaryLocation, FLAGS_mountpoint.c_str(),   "-f",
+        "-s",           "-odaemon_timeout=2592000", "-ojail_symlinks"};
     argv = (char **)const_argv;
   }
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
@@ -94,21 +96,25 @@ int main(int argc, char *argv[]) {
       fileSystem));
   sleep(1);
 
-  shared_ptr<thread> fuseThread(
-      new thread(runFuse, argv[0], client, fileSystem));
+  auto future = std::async(std::launch::async, [client] {
+    int counter = 0;
+    while (true) {
+      int retval = client->update();
+      if (retval) {
+        return retval;
+      }
+      if (++counter % 300 == 0) {
+        client->heartbeat();
+      }
+      usleep(10 * 1000);
+    }
+  });
 
-  int counter = 0;
-  while (true) {
-    int retval = client->update();
-    if (retval) {
-      return retval;
-    }
-    if (++counter % 3000 == 0) {
-      client->heartbeat();
-    }
-    usleep(1000);
-  }
+  runFuse(argv[0], client, fileSystem);
+
   LOG(INFO) << "Client finished";
+  cout << "Client finished" << endl;
+  return 0;
 }
 }  // namespace codefs
 
