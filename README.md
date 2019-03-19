@@ -64,7 +64,7 @@ Note that, as of now, there is **no** security or encryption.  This means that p
 To connect to the server with port forwarding:
 
 ```
-et -x -t=2298:2298 my_server.com
+et -x -t="2298:2298" my_server.com
 ```
 
 Then inside the et/ssh session, run:
