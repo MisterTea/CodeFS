@@ -46,29 +46,25 @@ void ServerFileSystem::scanRecursively(
   FileData p_filedata = scanNode(path_string, result);
 
   boost::filesystem::path pt(path_string);
-  try {
-    if (exists(pt) && boost::filesystem::is_directory(pt)) {
-      // path exists
-      for (auto& p : boost::make_iterator_range(
-               boost::filesystem::directory_iterator(pt), {})) {
-        string p_str = p.path().string();
-        if (boost::filesystem::is_regular_file(p.path()) ||
-            boost::filesystem::is_symlink(p.path())) {
-          // LOG(INFO) << "SCANNING FILE " << p_str;
-          scanNode(p_str, result);
-        } else if (boost::filesystem::is_directory(p.path())) {
-          scanRecursively(p_str, result);
-        } else {
-          LOG(ERROR)
-              << p << " exists, but is neither a regular file nor a directory";
-        }
+  if (exists(pt) && boost::filesystem::is_directory(pt)) {
+    // path exists
+    for (auto& p : boost::make_iterator_range(
+             boost::filesystem::directory_iterator(pt), {})) {
+      string p_str = p.path().string();
+      if (boost::filesystem::is_symlink(p.path()) ||
+          boost::filesystem::is_regular_file(p.path())) {
+        // LOG(INFO) << "SCANNING FILE " << p_str;
+        scanNode(p_str, result);
+      } else if (boost::filesystem::is_directory(p.path())) {
+        scanRecursively(p_str, result);
+      } else {
+        LOG(ERROR) << p
+                   << " exists, but is neither a regular file nor a directory";
       }
-    } else {
-      LOG(ERROR) << "path " << path_string
-                 << "doesn't exist or isn't a directory!";
     }
-  } catch (const boost::filesystem::filesystem_error& ex) {
-    LOG(ERROR) << ex.what();
+  } else {
+    LOG(ERROR) << "path " << path_string
+               << "doesn't exist or isn't a directory!";
   }
 
   LOG(INFO) << "RECURSIVE SCAN FINISHED";
