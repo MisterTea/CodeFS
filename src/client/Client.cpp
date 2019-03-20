@@ -30,13 +30,8 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
                         "server if you want to begin a new session"
                      << endl;
         }
-        FileDataBatch allFileDataProto =
-            reader.readProtoCompressed<FileDataBatch>();
-        vector<FileData> allFileData;
-        for (int a = 0; a < allFileDataProto.file_data_size(); a++) {
-          allFileData.push_back(allFileDataProto.file_data(a));
-        }
-        fileSystem->init(allFileData);
+        fileSystem->deserializeAllFileDataCompressed(
+            reader.readPrimitive<string>());
         break;
       }
     }

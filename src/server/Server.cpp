@@ -177,11 +177,8 @@ int Server::update() {
         writer.writePrimitive<bool>(init);
         if (!init) {
           init = true;
-          FileDataBatch fileDataBatch;
-          for (auto &it : fileSystem->allFileData) {
-            *(fileDataBatch.add_file_data()) = it.second;
-          }
-          writer.writeProtoCompressed(fileDataBatch);
+          writer.writePrimitive<string>(
+              fileSystem->serializeAllFileDataCompressed());
         }
         reply(id, writer.finish());
         LOG(INFO) << "REPLY SENT";

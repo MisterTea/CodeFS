@@ -179,7 +179,11 @@ FileData ServerFileSystem::scanNode(const string& path,
     FATAL_FAIL(nbytes);
     s = s.substr(0, nbytes + 1);
     if (s[0] == '/') {
-      s = absoluteToRelative(s);
+      if (s.find(rootPath) == 0) {
+        s = absoluteToRelative(s);
+      } else {
+        // This symlink goes outside the root directory.
+      }
     }
     fd.set_symlink_contents(s);
   }
@@ -188,7 +192,11 @@ FileData ServerFileSystem::scanNode(const string& path,
     // Populate children
     for (auto& it : boost::make_iterator_range(
              boost::filesystem::directory_iterator(path), {})) {
-      fd.add_child_node(it.path().filename().string());
+      if (boost::filesystem::is_symlink(it.path()) ||
+          boost::filesystem::is_regular_file(it.path()) ||
+          boost::filesystem::is_directory(it.path())) {
+        fd.add_child_node(it.path().filename().string());
+      }
     }
   }
 

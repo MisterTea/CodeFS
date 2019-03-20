@@ -108,6 +108,9 @@ add_library(
   src/base/RawSocketUtils.hpp
   src/base/RawSocketUtils.cpp
 
+  src/base/FileSystem.hpp
+  src/base/FileSystem.cpp
+
   src/base/FileUtils.hpp
   src/base/FileUtils.cpp
 

@@ -80,7 +80,8 @@ class ServerFileSystem : public FileSystem {
 
   int symlink(const string &from, const string &to) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-    return ::symlink(relativeToAbsolute(from).c_str(), relativeToAbsolute(to).c_str());
+    return ::symlink(relativeToAbsolute(from).c_str(),
+                     relativeToAbsolute(to).c_str());
   }
 
   int link(const string &from, const string &to) {
@@ -119,7 +120,7 @@ class ServerFileSystem : public FileSystem {
   int utimensat(const string &path, struct timespec ts[2]) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     int res = ::utimensat(0, relativeToAbsolute(path).c_str(), ts,
-                       AT_SYMLINK_NOFOLLOW);
+                          AT_SYMLINK_NOFOLLOW);
     rescanPath(relativeToAbsolute(path));
     return res;
   }
@@ -135,7 +136,7 @@ class ServerFileSystem : public FileSystem {
                 int64_t size, int flags) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     int res = ::lsetxattr(relativeToAbsolute(path).c_str(), name.c_str(),
-                       value.c_str(), size, flags);
+                          value.c_str(), size, flags);
     rescanPath(relativeToAbsolute(path));
     return res;
   }

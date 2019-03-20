@@ -177,6 +177,9 @@ class FileSystem {
     fileStat->st_ctime = fStat.ctime();
   }
 
+  string serializeAllFileDataCompressed();
+  void deserializeAllFileDataCompressed(const string &s);
+
   unordered_map<int64_t, FdInfo> fdMap;
   unordered_map<int64_t, DirectoryPointer *> dirpMap;
   unordered_map<string, FileData> allFileData;

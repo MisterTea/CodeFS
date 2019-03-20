@@ -10,12 +10,6 @@ class ClientFileSystem : public FileSystem {
 
   virtual ~ClientFileSystem() {}
 
-  void init(const vector<FileData>& initialData) {
-    for (const FileData& fd : initialData) {
-      allFileData.emplace(fd.path(), fd);
-    }
-  }
-
   inline void invalidatePath(const string& path) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     LOG(INFO) << "INVALIDATING PATH: " << path;
