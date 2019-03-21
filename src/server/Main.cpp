@@ -101,7 +101,22 @@ int main(int argc, char *argv[]) {
                    .string();
   cout << "CANONICAL PATH: " << FLAGS_path << endl;
 
-  shared_ptr<ServerFileSystem> fileSystem(new ServerFileSystem(FLAGS_path));
+  // Check for .codefs config
+  auto cfgPath =
+      boost::filesystem::path(FLAGS_path) / boost::filesystem::path(".codefs");
+  vector<string> excludes;
+  if (boost::filesystem::exists(cfgPath)) {
+    CSimpleIniA ini(true, true, true);
+    SI_Error rc = ini.LoadFile(cfgPath.string().c_str());
+    if (rc == 0) {
+      excludes = split(ini.GetValue("Scanner", "Excludes", NULL), ',');
+    } else {
+      LOG(FATAL) << "Invalid ini file: " << cfgPath;
+    }
+  }
+
+  shared_ptr<ServerFileSystem> fileSystem(
+      new ServerFileSystem(FLAGS_path, excludes));
   shared_ptr<Server> server(new Server(
       string("tcp://") + "0.0.0.0" + ":" + to_string(FLAGS_port), fileSystem));
 

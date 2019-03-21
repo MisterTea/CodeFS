@@ -82,6 +82,7 @@ include_directories(
   src/base
   external/msgpack-3.0.1/include
   external/Optional
+  external/simpleini
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${GFLAGS_INCLUDE_DIRS}
@@ -95,6 +96,8 @@ include_directories(
 add_library(
   codefs-lib
   STATIC
+
+  external/simpleini/ConvertUTF.c
 
   src/base/easylogging++.h
   src/base/easylogging++.cc

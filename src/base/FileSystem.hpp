@@ -103,6 +103,7 @@ class FileSystem {
       if (fileData.invalid()) {
         LOG(INFO) << "INVALIDAING " << fileData.path();
       }
+      LOG(INFO) << "UPDATING " << fileData.path();
       allFileData.insert(make_pair(fileData.path(), fileData));
     }
   }

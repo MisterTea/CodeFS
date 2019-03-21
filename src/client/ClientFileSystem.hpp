@@ -40,7 +40,8 @@ class ClientFileSystem : public FileSystem {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     invalidatePathAndParent(path);
     for (auto& it : allFileData) {
-      if (it.first.find(path) == 0) {
+      if (it.first.find(path + string("/")) == 0) {
+        LOG(INFO) << "INVALIDATING " << it.first;
         it.second.set_invalid(true);
       }
     }

@@ -12,7 +12,8 @@ class ServerFileSystem : public FileSystem {
                                  const FileData &fileData) = 0;
   };
 
-  explicit ServerFileSystem(const string &_rootPath);
+  explicit ServerFileSystem(const string &_rootPath,
+                            const vector<string> &_excludes);
   virtual ~ServerFileSystem() {}
 
   void init();
@@ -149,6 +150,7 @@ class ServerFileSystem : public FileSystem {
  protected:
   bool initialized;
   Handler *handler;
+  vector<string> excludes;
 };
 }  // namespace codefs
 

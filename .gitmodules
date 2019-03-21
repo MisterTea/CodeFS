@@ -1,3 +1,6 @@
 [submodule "external/Optional"]
 	path = external/Optional
 	url = https://github.com/akrzemi1/Optional.git
+[submodule "external/simpleini"]
+	path = external/simpleini
+	url = https://github.com/brofield/simpleini.git

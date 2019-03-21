@@ -1,8 +1,12 @@
 #include "ServerFileSystem.hpp"
 
 namespace codefs {
-ServerFileSystem::ServerFileSystem(const string& _rootPath)
-    : FileSystem(_rootPath), initialized(false), handler(NULL) {}
+ServerFileSystem::ServerFileSystem(const string& _rootPath,
+                                   const vector<string>& _excludes)
+    : FileSystem(_rootPath),
+      initialized(false),
+      handler(NULL),
+      excludes(_excludes) {}
 
 void ServerFileSystem::init() {
   scanRecursively(rootPath, &allFileData);
