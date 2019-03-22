@@ -162,9 +162,7 @@ static int codefs_write(const char *path, const char *buf, size_t size,
 static int codefs_statfs(const char *path, struct statvfs *stbuf) {
   int res;
 
-  LOG(INFO) << "BEGIN CLIENT STATFS";
   res = client->statvfs(stbuf);
-  LOG(INFO) << "END CLIENT STATFS";
   if (res == -1) return -errno;
 
   return 0;

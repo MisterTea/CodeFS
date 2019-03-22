@@ -29,8 +29,8 @@ class Client {
   int open(const string& path, int flags);
   int create(const string& path, int flags, mode_t mode);
   int close(const string& path, int fd);
-  int pread(const string& path, char* buf, int size, int offset);
-  int pwrite(const string& path, const char* buf, int size, int offset);
+  int pread(const string& path, char* buf, int64_t size, int64_t offset);
+  int pwrite(const string& path, const char* buf, int64_t size, int64_t offset);
 
   int mkdir(const string& path, mode_t mode);
   int unlink(const string& path);
@@ -66,6 +66,7 @@ class Client {
   MessageReader reader;
   MessageWriter writer;
   recursive_mutex rpcMutex;
+  optional<StatVfsData> cachedStatVfsProto;
   int fdCounter;
   int twoPathsNoReturn(unsigned char header, const string& from,
                        const string& to);

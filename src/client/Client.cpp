@@ -53,6 +53,7 @@ int Client::update() {
       case SERVER_CLIENT_METADATA_UPDATE: {
         string path = reader.readPrimitive<string>();
         LOG(INFO) << "UPDATING PATH: " << path;
+        cachedStatVfsProto.reset();
         FileData fileData = reader.readProto<FileData>();
         if (fileData.invalid()) {
           LOG(FATAL) << "Got filedata with invalid set";
@@ -93,6 +94,7 @@ int Client::open(const string& path, int flags) {
       string payload;
       {
         lock_guard<std::recursive_mutex> lock(rpcMutex);
+        cachedStatVfsProto.reset();
         writer.start();
         writer.writePrimitive<unsigned char>(CLIENT_SERVER_REQUEST_FILE);
         writer.writePrimitive<string>(path);
@@ -143,6 +145,7 @@ int Client::create(const string& path, int flags, mode_t mode) {
       string payload;
       {
         lock_guard<std::recursive_mutex> lock(rpcMutex);
+        cachedStatVfsProto.reset();
         writer.start();
         writer.writePrimitive<unsigned char>(CLIENT_SERVER_CREATE_FILE);
         writer.writePrimitive<string>(path);
@@ -186,6 +189,7 @@ int Client::close(const string& path, int fd) {
   string payload;
   {
     lock_guard<std::recursive_mutex> lock(rpcMutex);
+    cachedStatVfsProto.reset();
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_RETURN_FILE);
     writer.writePrimitive<string>(path);
@@ -219,23 +223,24 @@ int Client::close(const string& path, int fd) {
     return 0;
   }
 }
-int Client::pread(const string& path, char* buf, int size, int offset) {
+int Client::pread(const string& path, char* buf, int64_t size, int64_t offset) {
   auto it = ownedFileContents.find(path);
   if (it == ownedFileContents.end()) {
     LOG(FATAL) << "TRIED TO READ AN INVALID PATH";
   }
   const auto& content = it->second.content;
-  if (offset >= int(content.size())) {
+  if (offset >= int64_t(content.size())) {
     return 0;
   }
   auto start = content.c_str() + offset;
-  int actualSize = min(int(content.size()), offset + size) - offset;
+  int64_t actualSize = min(int64_t(content.size()), offset + size) - offset;
   LOG(INFO) << content.size() << " " << size << " " << offset << " "
             << actualSize << endl;
   memcpy(buf, start, actualSize);
   return actualSize;
 }
-int Client::pwrite(const string& path, const char* buf, int size, int offset) {
+int Client::pwrite(const string& path, const char* buf, int64_t size,
+                   int64_t offset) {
   auto it = ownedFileContents.find(path);
   if (it == ownedFileContents.end()) {
     LOG(FATAL) << "TRIED TO READ AN INVALID PATH: " << path;
@@ -245,7 +250,7 @@ int Client::pwrite(const string& path, const char* buf, int size, int offset) {
   }
   auto& content = it->second.content;
   LOG(INFO) << "WRITING " << size << " TO " << path << " AT " << offset;
-  if (int(content.size()) < offset + size) {
+  if (int64_t(content.size()) < offset + size) {
     content.resize(offset + size, '\0');
   }
   memcpy(&(content[offset]), buf, size);
@@ -253,6 +258,7 @@ int Client::pwrite(const string& path, const char* buf, int size, int offset) {
 }
 
 int Client::mkdir(const string& path, mode_t mode) {
+  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(path);
   string payload;
   {
@@ -277,22 +283,26 @@ int Client::mkdir(const string& path, mode_t mode) {
 }
 
 int Client::unlink(const string& path) {
+  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(path);
   return singlePathNoReturn(CLIENT_SERVER_UNLINK, path);
 }
 
 int Client::rmdir(const string& path) {
+  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(path);
   return singlePathNoReturn(CLIENT_SERVER_RMDIR, path);
 }
 
 int Client::symlink(const string& from, const string& to) {
+  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(from);
   fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_SYMLINK, from, to);
 }
 
 int Client::rename(const string& from, const string& to) {
+  cachedStatVfsProto.reset();
   LOG(INFO) << "RENAMING FROM " << from << " TO " << to;
   if (ownedFileContents.find(to) != ownedFileContents.end()) {
     LOG(FATAL) << "I don't handle renaming from one open file to another yet";
@@ -307,6 +317,7 @@ int Client::rename(const string& from, const string& to) {
 }
 
 int Client::link(const string& from, const string& to) {
+  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(from);
   fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_LINK, from, to);
@@ -360,6 +371,7 @@ int Client::lchown(const string& path, int64_t uid, int64_t gid) {
   }
 }
 int Client::truncate(const string& path, int64_t size) {
+  cachedStatVfsProto.reset();
   if (ownedFileContents.find(path) != ownedFileContents.end()) {
     ownedFileContents.at(path).content.resize(size, '\0');
     return 0;
@@ -388,40 +400,44 @@ int Client::truncate(const string& path, int64_t size) {
   }
 }
 int Client::statvfs(struct statvfs* stbuf) {
-  string payload;
-  {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
-    writer.start();
-    writer.writePrimitive<unsigned char>(CLIENT_SERVER_STATVFS);
-    payload = writer.finish();
-  }
-  string result = fileRpc(payload);
-  LOG(INFO) << "GOT RESULT " << result;
-  {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
-    reader.load(result);
-    LOG(INFO) << "READING RES";
-    int res = reader.readPrimitive<int>();
-    LOG(INFO) << "READING ERRNO";
-    int rpcErrno = reader.readPrimitive<int>();
-    StatVfsData statVfsProto = reader.readProto<StatVfsData>();
-    if (res) {
-      errno = rpcErrno;
-      return res;
+  StatVfsData statVfsProto;
+
+  if (cachedStatVfsProto) {
+    statVfsProto = *cachedStatVfsProto;
+  } else {
+    string payload;
+    {
+      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      writer.start();
+      writer.writePrimitive<unsigned char>(CLIENT_SERVER_STATVFS);
+      payload = writer.finish();
     }
-    stbuf->f_bsize = statVfsProto.bsize();
-    stbuf->f_frsize = statVfsProto.frsize();
-    stbuf->f_blocks = statVfsProto.blocks();
-    stbuf->f_bfree = statVfsProto.bfree();
-    stbuf->f_bavail = statVfsProto.bavail();
-    stbuf->f_files = statVfsProto.files();
-    stbuf->f_ffree = statVfsProto.ffree();
-    stbuf->f_favail = statVfsProto.favail();
-    stbuf->f_fsid = statVfsProto.fsid();
-    stbuf->f_flag = statVfsProto.flag();
-    stbuf->f_namemax = statVfsProto.namemax();
-    return 0;
+    string result = fileRpc(payload);
+    {
+      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      reader.load(result);
+      int res = reader.readPrimitive<int>();
+      int rpcErrno = reader.readPrimitive<int>();
+      statVfsProto = reader.readProto<StatVfsData>();
+      if (res) {
+        errno = rpcErrno;
+        return res;
+      }
+      cachedStatVfsProto = statVfsProto;
+    }
   }
+  stbuf->f_bsize = statVfsProto.bsize();
+  stbuf->f_frsize = statVfsProto.frsize();
+  stbuf->f_blocks = statVfsProto.blocks();
+  stbuf->f_bfree = statVfsProto.bfree();
+  stbuf->f_bavail = statVfsProto.bavail();
+  stbuf->f_files = statVfsProto.files();
+  stbuf->f_ffree = statVfsProto.ffree();
+  stbuf->f_favail = statVfsProto.favail();
+  stbuf->f_fsid = statVfsProto.fsid();
+  stbuf->f_flag = statVfsProto.flag();
+  stbuf->f_namemax = statVfsProto.namemax();
+  return 0;
 }
 
 int Client::utimensat(const string& path, const struct timespec ts[2]) {

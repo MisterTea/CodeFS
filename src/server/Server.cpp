@@ -310,7 +310,6 @@ int Server::update() {
         fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
       } break;
       case CLIENT_SERVER_STATVFS: {
-        LOG(INFO) << "STARTING STATVFS";
         struct statvfs stbuf;
         int res =
             ::statvfs(fileSystem->relativeToAbsolute("/").c_str(), &stbuf);
@@ -334,9 +333,7 @@ int Server::update() {
           statVfsProto.set_namemax(stbuf.f_namemax);
         }
         writer.writeProto<StatVfsData>(statVfsProto);
-        LOG(INFO) << "STARTING STATVFS REPLY";
         reply(id, writer.finish());
-        LOG(INFO) << "ENDING STATVFS";
       } break;
       case CLIENT_SERVER_UTIMENSAT: {
         string path = reader.readPrimitive<string>();
