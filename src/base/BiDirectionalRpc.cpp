@@ -268,7 +268,7 @@ void BiDirectionalRpc::sendReply(const IdPayload& idPayload) {
   // Try to attach more requests to this packet
   int i = 0;
   while (!outgoingReplies.empty() &&
-         rpcsSent.size() < outgoingRequests.size()) {
+         rpcsSent.size() < outgoingReplies.size()) {
     DRAW_FROM_UNORDERED(it, outgoingReplies);
     if (rpcsSent.find(it->id) != rpcsSent.end()) {
       // Drew an rpc that's already in the packet.  Just bail for now, maybe in
