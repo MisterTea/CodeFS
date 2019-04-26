@@ -88,10 +88,8 @@ extern "C" {
 #include "zmq.hpp"
 #include "zmq_addon.hpp"
 
-#ifndef _LIBCPP_OPTIONAL
 #include "optional.hpp"
 using namespace std::experimental;
-#endif
 
 #include "CodeFS.pb.h"
 

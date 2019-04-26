@@ -39,7 +39,7 @@ enum RpcHeader { HEARTBEAT = 1, REQUEST = 2, REPLY = 3, ACKNOWLEDGE = 4 };
 
 class BiDirectionalRpc {
  public:
-  BiDirectionalRpc();
+  BiDirectionalRpc(bool _reliable);
   virtual ~BiDirectionalRpc();
   void shutdown();
   void heartbeat();
@@ -115,6 +115,7 @@ class BiDirectionalRpc {
   uint64_t onBarrier;
   uint64_t onId;
   bool flaky;
+  bool reliable;
 
   void handleRequest(const RpcId& rpcId, const string& payload);
   void handleReply(const RpcId& rpcId, const string& payload);

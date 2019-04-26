@@ -43,13 +43,15 @@ void runServer(const string& address, int* tasksLeft, bool bind, bool flaky,
     }
 
     bool done = false;
-    while (*tasksLeft) {
-      if (reconnect && rand() % 5 == 0) {
+    for (int a = 0; *tasksLeft; a++) {
+      if (reconnect && rand() % 500 == 0) {
         server.reconnect();
       }
-      usleep(1000 * 1000);
+      usleep(10 * 1000);
       server.update();
-      server.heartbeat();
+      if (a % 100 == 0) {
+        server.heartbeat();
+      }
       while (server.hasIncomingRequest()) {
         auto idPayload = server.getFirstIncomingRequest();
         server.reply(idPayload.id, idPayload.payload + idPayload.payload);
@@ -68,6 +70,7 @@ void runServer(const string& address, int* tasksLeft, bool bind, bool flaky,
     }
 
     // TODO: We may still have work to do so check for other server to be done
+    sleep(3);
 
     EXPECT_TRUE(uidPayloadMap.empty());
 

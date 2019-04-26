@@ -21,15 +21,6 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
       if (rpc->hasIncomingReplyWithId(initId)) {
         string payload = rpc->consumeIncomingReplyWithId(initId);
         reader.load(payload);
-        bool serverAlreadyRunning = reader.readPrimitive<bool>();
-        if (serverAlreadyRunning) {
-          cout << "The server is already serving a client.  Restart the server "
-                  "if you want to begin a new session"
-               << endl;
-          LOG(FATAL) << "The server is already serving a client.  Restart the "
-                        "server if you want to begin a new session"
-                     << endl;
-        }
         fileSystem->deserializeAllFileDataCompressed(
             reader.readPrimitive<string>());
         break;

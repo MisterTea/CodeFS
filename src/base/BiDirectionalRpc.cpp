@@ -3,7 +3,8 @@
 #include "TimeHandler.hpp"
 
 namespace codefs {
-BiDirectionalRpc::BiDirectionalRpc() : onBarrier(0), onId(0), flaky(false) {}
+BiDirectionalRpc::BiDirectionalRpc(bool _reliable)
+    : onBarrier(0), onId(0), flaky(false), reliable(_reliable) {}
 
 BiDirectionalRpc::~BiDirectionalRpc() {}
 
@@ -12,7 +13,7 @@ void BiDirectionalRpc::shutdown() {}
 void BiDirectionalRpc::heartbeat() {
   VLOG(1) << "BEAT: " << int64_t(this);
   if (!outgoingReplies.empty() || !outgoingRequests.empty()) {
-    // resendRandomOutgoingMessage();
+    resendRandomOutgoingMessage();
   } else {
     VLOG(1) << "SENDING HEARTBEAT";
     string s = "0";
@@ -228,29 +229,29 @@ void BiDirectionalRpc::sendRequest(const IdPayload& idPayload) {
   writer.writePrimitive<unsigned char>(REQUEST);
   writer.writeClass<RpcId>(idPayload.id);
   writer.writePrimitive<string>(idPayload.payload);
-#if 0
-  // Try to attach more requests to this packet
-  int i = 0;
-  while (!outgoingRequests.empty() &&
-         rpcsSent.size() < outgoingRequests.size()) {
-    DRAW_FROM_UNORDERED(it, outgoingRequests);
-    if (rpcsSent.find(it->id) != rpcsSent.end()) {
-      // Drew an rpc that's already in the packet.  Just bail for now, maybe in
-      // the future do something more clever.
-      break;
+  if (!reliable) {
+    // Try to attach more requests to this packet
+    int i = 0;
+    while (!outgoingRequests.empty() &&
+           rpcsSent.size() < outgoingRequests.size()) {
+      DRAW_FROM_UNORDERED(it, outgoingRequests);
+      if (rpcsSent.find(it->id) != rpcsSent.end()) {
+        // Drew an rpc that's already in the packet.  Just bail for now, maybe
+        // in the future do something more clever.
+        break;
+      }
+      int size = sizeof(RpcId) + it->payload.length();
+      if (size + writer.size() > 400) {
+        // Too big
+        break;
+      }
+      i++;
+      rpcsSent.insert(it->id);
+      writer.writeClass<RpcId>(it->id);
+      writer.writePrimitive<string>(it->payload);
     }
-    int size = sizeof(RpcId) + it->payload.length();
-    if (size + writer.size() > 400) {
-      // Too big
-      break;
-    }
-    i++;
-    rpcsSent.insert(it->id);
-    writer.writeClass<RpcId>(it->id);
-    writer.writePrimitive<string>(it->payload);
+    VLOG(1) << "Attached " << i << " extra packets";
   }
-  VLOG(1) << "Attached " << i << " extra packets";
-#endif
   send(writer.finish());
 }
 
@@ -264,29 +265,29 @@ void BiDirectionalRpc::sendReply(const IdPayload& idPayload) {
   writer.writePrimitive<unsigned char>(REPLY);
   writer.writeClass<RpcId>(idPayload.id);
   writer.writePrimitive<string>(idPayload.payload);
-#if 0
-  // Try to attach more requests to this packet
-  int i = 0;
-  while (!outgoingReplies.empty() &&
-         rpcsSent.size() < outgoingReplies.size()) {
-    DRAW_FROM_UNORDERED(it, outgoingReplies);
-    if (rpcsSent.find(it->id) != rpcsSent.end()) {
-      // Drew an rpc that's already in the packet.  Just bail for now, maybe in
-      // the future do something more clever.
-      break;
+  if (!reliable) {
+    // Try to attach more requests to this packet
+    int i = 0;
+    while (!outgoingReplies.empty() &&
+           rpcsSent.size() < outgoingReplies.size()) {
+      DRAW_FROM_UNORDERED(it, outgoingReplies);
+      if (rpcsSent.find(it->id) != rpcsSent.end()) {
+        // Drew an rpc that's already in the packet.  Just bail for now, maybe
+        // in the future do something more clever.
+        break;
+      }
+      int size = sizeof(RpcId) + it->payload.length();
+      if (size + writer.size() > 400) {
+        // Too big
+        break;
+      }
+      i++;
+      rpcsSent.insert(it->id);
+      writer.writeClass<RpcId>(it->id);
+      writer.writePrimitive<string>(it->payload);
     }
-    int size = sizeof(RpcId) + it->payload.length();
-    if (size + writer.size() > 400) {
-      // Too big
-      break;
-    }
-    i++;
-    rpcsSent.insert(it->id);
-    writer.writeClass<RpcId>(it->id);
-    writer.writePrimitive<string>(it->payload);
+    VLOG(1) << "Attached " << i << " extra packets";
   }
-  VLOG(1) << "Attached " << i << " extra packets";
-#endif
   send(writer.finish());
 }
 

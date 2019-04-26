@@ -86,7 +86,6 @@ int Server::update() {
         }
 
         if (access) {
-          clientLockedPaths.insert(path);
           writer.writePrimitive<int>(0);
         }
         reply(id, writer.finish());
@@ -135,7 +134,6 @@ int Server::update() {
             LOG(INFO) << "READ FILE: " << path << " " << fileContents.size();
           }
 
-          clientLockedPaths.insert(path);
           writer.writePrimitive<int>(0);
           writer.writePrimitive<string>(compressString(fileContents));
         }
@@ -171,15 +169,11 @@ int Server::update() {
         }
       } break;
       case CLIENT_SERVER_INIT: {
-        static bool init = false;
         LOG(INFO) << "INITIALIZING";
+        auto s = fileSystem->serializeAllFileDataCompressed();
+        LOG(INFO) << "INIT IS " << s.length() << " BYTES";
         writer.start();
-        writer.writePrimitive<bool>(init);
-        if (!init) {
-          init = true;
-          writer.writePrimitive<string>(
-              fileSystem->serializeAllFileDataCompressed());
-        }
+        writer.writePrimitive<string>(s);
         reply(id, writer.finish());
         LOG(INFO) << "REPLY SENT";
       } break;

@@ -2,11 +2,11 @@
 
 namespace codefs {
 ZmqBiDirectionalRpc::ZmqBiDirectionalRpc(const string& _address, bool _bind)
-    : BiDirectionalRpc(), address(_address), bind(_bind) {
+    : BiDirectionalRpc(false), address(_address), bind(_bind) {
   context = shared_ptr<zmq::context_t>(new zmq::context_t(4));
   socket =
       shared_ptr<zmq::socket_t>(new zmq::socket_t(*(context.get()), ZMQ_PAIR));
-  // socket->setsockopt(ZMQ_LINGER, 3000);
+  socket->setsockopt(ZMQ_LINGER, 3000);
   if (bind) {
     LOG(INFO) << "Binding on address: " << address;
     socket->bind(address);
@@ -55,12 +55,10 @@ void ZmqBiDirectionalRpc::update() {
 }
 
 void ZmqBiDirectionalRpc::reconnect() {
-  LOG(FATAL) << "Reconnect is disabled";
   shutdown();
 
   context = shared_ptr<zmq::context_t>(new zmq::context_t(4));
-  socket =
-      shared_ptr<zmq::socket_t>(new zmq::socket_t(*(context.get()), ZMQ_PAIR));
+  socket.reset(new zmq::socket_t(*(context.get()), ZMQ_PAIR));
   socket->setsockopt(ZMQ_LINGER, 3000);
   if (bind) {
     LOG(INFO) << "Binding on address: " << address;
@@ -76,6 +74,18 @@ void ZmqBiDirectionalRpc::send(const string& message) {
     LOG(FATAL) << "Invalid message size";
   }
   zmq::message_t zmqMessage(message.c_str(), message.length());
-  FATAL_IF_FALSE_NOT_EAGAIN(socket->send(zmqMessage, ZMQ_DONTWAIT));
+  auto startSendTime = time(NULL);
+  while (true) {
+    bool retval = socket->send(zmqMessage, ZMQ_DONTWAIT);
+    if (retval) {
+      break;
+    }
+    FATAL_IF_FALSE_NOT_EAGAIN(retval);
+    usleep(100 * 1000);
+    if (startSendTime + 5 < time(NULL)) {
+      reconnect();
+      startSendTime = time(NULL);
+    }
+  }
 }
 }  // namespace codefs
