@@ -168,14 +168,14 @@ int Server::update() {
           fileSystem->rescanPathAndParent(fileSystem->relativeToAbsolute(path));
         }
       } break;
-      case CLIENT_SERVER_INIT: {
-        LOG(INFO) << "INITIALIZING";
-        auto s = fileSystem->serializeAllFileDataCompressed();
-        LOG(INFO) << "INIT IS " << s.length() << " BYTES";
+      case CLIENT_SERVER_FETCH_METADATA: {
+        string path = reader.readPrimitive<string>();
+        LOG(INFO) << "Fetching Metadata for " << path;
+        auto s = fileSystem->serializeFileDataCompressed(path);
         writer.start();
+        writer.writePrimitive<string>(path);
         writer.writePrimitive<string>(s);
         reply(id, writer.finish());
-        LOG(INFO) << "REPLY SENT";
       } break;
       case CLIENT_SERVER_MKDIR: {
         string path = reader.readPrimitive<string>();

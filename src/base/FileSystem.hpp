@@ -6,91 +6,17 @@
 namespace codefs {
 class FileSystem {
  public:
-  class DirectoryPointer {
-   public:
-    string directory;
-    int offset;
-
-    DirectoryPointer(const string &_directory)
-        : directory(_directory), offset(0) {}
-  };
-
-  class FdInfo {
-   public:
-    string path;
-
-    FdInfo(const string &_path) : path(_path) {}
-  };
-
   explicit FileSystem(const string &_rootPath) : rootPath(_rootPath) {
     boost::trim_right_if(rootPath, boost::is_any_of("/"));
   }
 
   virtual optional<FileData> getNode(const string &path) {
-    while (true) {
-      {
-        std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-        auto it = allFileData.find(path);
-        if (it == allFileData.end()) {
-          return nullopt;
-        }
-        bool invalid = it->second.invalid();
-        if (!invalid) {
-          return it->second;
-        } else {
-          LOG(INFO) << path << " is invalid, waiting for new version";
-        }
-      }
-      usleep(100 * 1000);
+    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    auto it = allFileData.find(path);
+    if (it == allFileData.end()) {
+      return nullopt;
     }
-  }
-
-  virtual optional<FileData> getNodeAndChildren(const string &path,
-                                                vector<FileData> *children) {
-    vector<FileData> tmpChildren;
-    while (true) {
-      {
-        std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-        auto it = allFileData.find(path);
-        if (it == allFileData.end()) {
-          return nullopt;
-        }
-        bool invalid = it->second.invalid();
-        if (!invalid) {
-          FileData parentNode = it->second;
-
-          // Check the children
-          LOG(INFO) << "NUM CHILDREN: " << parentNode.child_node_size();
-          bool failed = false;
-          tmpChildren.clear();
-          for (int a = 0; a < parentNode.child_node_size(); a++) {
-            string fileName = parentNode.child_node(a);
-            string childPath = (boost::filesystem::path(parentNode.path()) /
-                                boost::filesystem::path(fileName))
-                                   .string();
-
-            auto childIt = allFileData.find(childPath);
-            if (childIt == allFileData.end() || childIt->second.invalid()) {
-              if (childIt == allFileData.end())
-                LOG(INFO) << "MISSING CHILD: " << childPath;
-              else
-                LOG(INFO) << "INVALID CHILD: " << childPath;
-              failed = true;
-              break;
-            }
-            tmpChildren.push_back(childIt->second);
-          }
-
-          if (!failed) {
-            *children = tmpChildren;
-            return parentNode;
-          }
-        } else {
-          LOG(INFO) << path << " is invalid, waiting for new version";
-        }
-      }
-      usleep(100 * 1000);
-    }
+    return it->second;
   }
 
   void setNode(const FileData &fileData) {
@@ -141,11 +67,6 @@ class FileSystem {
     return (boost::filesystem::path(rootPath) / relativePath).string();
   }
 
-  inline bool hasDirectory(const string &path) {
-    auto fileData = getNode(path);
-    return fileData && S_ISDIR(fileData->stat_data().mode());
-  }
-
   static inline void statToProto(const struct stat &fileStat, StatData *fStat) {
     fStat->set_dev(fileStat.st_dev);
     fStat->set_ino(fileStat.st_ino);
@@ -178,11 +99,9 @@ class FileSystem {
     fileStat->st_ctime = fStat.ctime();
   }
 
-  string serializeAllFileDataCompressed();
-  void deserializeAllFileDataCompressed(const string &s);
+  string serializeFileDataCompressed(const string &path);
+  void deserializeFileDataCompressed(const string &path, const string &s);
 
-  unordered_map<int64_t, FdInfo> fdMap;
-  unordered_map<int64_t, DirectoryPointer *> dirpMap;
   unordered_map<string, FileData> allFileData;
 
  protected:

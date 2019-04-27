@@ -47,6 +47,44 @@ class ClientFileSystem : public FileSystem {
     }
   }
 
+  inline vector<string> getPathsToDownload(const string& path) {
+    auto it = allFileData.find(path);
+    if (it != allFileData.end()) {
+      // We already have this path, let's make sure we also have all the
+      // children
+      const auto& fd = it->second;
+      if (fd.child_node_size() == 0) {
+        return {};
+      }
+      bool haveChildren = true;
+      for (const auto& childName : fd.child_node()) {
+        auto childPath = (boost::filesystem::path(path) / childName).string();
+        if (allFileData.find(childPath) == allFileData.end()) {
+          haveChildren = false;
+          break;
+        }
+      }
+      if (haveChildren) {
+        return {};
+      } else {
+        return {path};
+      }
+    }
+    if (path == string("/")) {
+      LOG(FATAL) << "Somehow we don't have the root path???";
+    }
+    auto parentPath = boost::filesystem::path(path).parent_path().string();
+    vector<string> retval = getPathsToDownload(parentPath);
+    if (retval.empty()) {
+      // If we know the parent directory, then we know all children of the
+      // parent directory, so this file doesn't exist and doesn't need to be
+      // scanned
+    } else {
+      retval.push_back(path);
+    }
+    return retval;
+  }
+
   inline optional<string> getCachedFile(const string& path) {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
     auto it = fileCache.find(path);

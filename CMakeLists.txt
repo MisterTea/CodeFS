@@ -140,9 +140,6 @@ add_executable (
   src/client/Client.hpp
   src/client/Client.cpp
 
-  src/client/FuseAdapter.hpp
-  src/client/FuseAdapter.cpp
-
   src/client/ClientFuseAdapter.hpp
   src/client/ClientFuseAdapter.cpp
 

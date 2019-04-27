@@ -26,6 +26,14 @@ class Client {
     rpc->heartbeat();
   }
 
+  optional<FileData> getNode(const string& path);
+  optional<FileData> getNodeAndChildren(const string& path,
+                                        vector<FileData>* children);
+  inline bool hasDirectory(const string& path) {
+    auto fileData = getNode(path);
+    return fileData && S_ISDIR(fileData->stat_data().mode());
+  }
+
   int open(const string& path, int flags);
   int create(const string& path, int flags, mode_t mode);
   int close(const string& path, int fd);
@@ -63,8 +71,6 @@ class Client {
   shared_ptr<ZmqBiDirectionalRpc> rpc;
   shared_ptr<ClientFileSystem> fileSystem;
   unordered_map<string, OwnedFileInfo> ownedFileContents;
-  MessageReader reader;
-  MessageWriter writer;
   recursive_mutex rpcMutex;
   optional<StatVfsData> cachedStatVfsProto;
   int fdCounter;

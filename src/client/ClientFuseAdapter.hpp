@@ -3,17 +3,15 @@
 
 #include "Headers.hpp"
 
-#include "FuseAdapter.hpp"
-
 namespace codefs {
 class ClientFileSystem;
 class Client;
 
-class ClientFuseAdapter : public FuseAdapter {
+class ClientFuseAdapter {
  public:
-  virtual void assignClientCallbacks(shared_ptr<ClientFileSystem> _fileSystem,
-                                     shared_ptr<Client> _client,
-                                     fuse_operations* ops);
+  virtual void assignCallbacks(shared_ptr<ClientFileSystem> _fileSystem,
+                               shared_ptr<Client> _client,
+                               fuse_operations* ops);
 };
 }  // namespace codefs
 

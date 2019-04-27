@@ -51,7 +51,7 @@ void runFuse(char *binaryLocation, shared_ptr<Client> client,
   memset(&codefs_oper, 0, sizeof(fuse_operations));
 
   ClientFuseAdapter adapter;
-  adapter.assignClientCallbacks(fileSystem, client, &codefs_oper);
+  adapter.assignCallbacks(fileSystem, client, &codefs_oper);
 
   int res = fuse_main(argc, argv, &codefs_oper, NULL);
   fuse_opt_free_args(&args);
