@@ -2,7 +2,7 @@
 
 namespace codefs {
 ZmqBiDirectionalRpc::ZmqBiDirectionalRpc(const string& _address, bool _bind)
-    : BiDirectionalRpc(false), address(_address), bind(_bind) {
+    : BiDirectionalRpc(true), address(_address), bind(_bind) {
   context = shared_ptr<zmq::context_t>(new zmq::context_t(4));
   socket =
       shared_ptr<zmq::socket_t>(new zmq::socket_t(*(context.get()), ZMQ_PAIR));
