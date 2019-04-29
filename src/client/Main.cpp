@@ -8,7 +8,7 @@ DEFINE_string(hostname, "localhost", "Hostname to connect to");
 DEFINE_int32(port, 2298, "Port to connect to");
 DEFINE_string(mountpoint, "/tmp/clientmount",
               "Where to mount the FS for server access");
-DEFINE_bool(verbose, true, "Verbose logging");
+DEFINE_bool(verbose, false, "Verbose logging");
 DEFINE_bool(logtostdout, false, "Log to stdout in addition to the log file");
 
 namespace codefs {

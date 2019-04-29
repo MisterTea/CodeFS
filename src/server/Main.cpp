@@ -5,7 +5,7 @@
 
 DEFINE_int32(port, 2298, "Port to listen on");
 DEFINE_string(path, "", "Absolute path containing code for codefs to monitor");
-DEFINE_bool(verbose, true, "Verbose logging");
+DEFINE_bool(verbose, false, "Verbose logging");
 DEFINE_bool(logtostdout, false, "Log to stdout in addition to the log file");
 
 namespace {
