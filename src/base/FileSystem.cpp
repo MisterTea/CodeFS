@@ -15,7 +15,7 @@ string FileSystem::serializeFileDataCompressed(const string& path) {
     writer.writeProto(fileData);
     for (auto& it : fileData.child_node()) {
       auto childPath = (boost::filesystem::path(path) / it).string();
-      LOG(INFO) << "SCANNING: " << path << " / " << it << " = " << childPath;
+      VLOG(1) << "SCANNING: " << path << " / " << it << " = " << childPath;
       const auto& childFileData = allFileData.at(childPath);
       writer.writeProto(childFileData);
     }
@@ -29,10 +29,10 @@ void FileSystem::deserializeFileDataCompressed(const string& path,
   MessageReader reader;
   reader.load(decompressString(s));
   int numFiles = reader.readPrimitive<int>();
-  LOG(INFO) << "DESERIALIZING " << numFiles << " FILES";
+  VLOG(1) << "DESERIALIZING " << numFiles << " FILES";
   for (int a = 0; a < numFiles; a++) {
     auto fileData = reader.readProto<FileData>();
-    LOG(INFO) << "GOT FILE: " << fileData.path();
+    VLOG(1) << "GOT FILE: " << fileData.path();
     if (fileData.invalid()) {
       LOG(FATAL) << "Got an invalid file from the server!";
     }

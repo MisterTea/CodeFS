@@ -51,7 +51,7 @@ void ZmqBiDirectionalRpc::update() {
         LOG(INFO) << "Got a new client: "
                   << string(message.data<char>(), message.size()) << " "
                   << message.size();
-        clientIdentity.copy(&message);
+        clientIdentity.rebuild(message.data(), message.size());
       }
     }
     if (!message.more()) {
@@ -60,7 +60,6 @@ void ZmqBiDirectionalRpc::update() {
 
     // The data
     FATAL_IF_FALSE(socket->recv(&message));
-    LOG(INFO) << message.size();
     if (message.more()) {
       LOG(FATAL) << "DID NOT GET ALL";
     }
