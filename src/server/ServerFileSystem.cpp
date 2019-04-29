@@ -46,7 +46,7 @@ const int MAX_XATTR_SIZE = 64 * 1024;
 void ServerFileSystem::scanRecursively(
     const string& path_string, unordered_map<string, FileData>* result) {
   std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-  LOG(INFO) << "SCANNING DIRECTORY " << path_string;
+  VLOG(1) << "SCANNING DIRECTORY " << path_string;
   FileData p_filedata = scanNode(path_string, result);
 
   boost::filesystem::path pt(path_string);
@@ -62,23 +62,23 @@ void ServerFileSystem::scanRecursively(
       } else if (boost::filesystem::is_directory(p.path())) {
         scanRecursively(p_str, result);
       } else {
-        LOG(ERROR) << p
-                   << " exists, but is neither a regular file nor a directory";
+        LOG(INFO) << p
+                  << " exists, but is neither a regular file nor a directory";
       }
     }
   } else {
-    LOG(ERROR) << "path " << path_string
-               << "doesn't exist or isn't a directory!";
+    LOG(INFO) << "path " << path_string
+              << "doesn't exist or isn't a directory!";
   }
 
-  LOG(INFO) << "RECURSIVE SCAN FINISHED";
+  VLOG(1) << "RECURSIVE SCAN FINISHED";
   return;
 }
 
 FileData ServerFileSystem::scanNode(const string& path,
                                     unordered_map<string, FileData>* result) {
   std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
-  LOG(INFO) << "SCANNING NODE : " << path;
+  VLOG(1) << "SCANNING NODE : " << path;
 
   FileData fd;
   fd.set_path(absoluteToRelative(path));
@@ -95,11 +95,11 @@ FileData ServerFileSystem::scanNode(const string& path,
     if (boost::filesystem::symbolic_link_exists(path)) {
       symlinkToDeadFile = true;
     } else {
-      LOG(INFO) << "FILE IS GONE: " << path << " " << errno;
+      VLOG(1) << "FILE IS GONE: " << path << " " << errno;
       result->erase(absoluteToRelative(path));
       fd.set_deleted(true);
       if (handler != NULL) {
-        LOG(INFO) << "UPDATING METADATA: " << path;
+        VLOG(1) << "UPDATING METADATA: " << path;
         handler->metadataUpdated(absoluteToRelative(path), fd);
       }
 
@@ -132,12 +132,12 @@ FileData ServerFileSystem::scanNode(const string& path,
   }
 #else
   if (::faccessat(0, path.c_str(), F_OK, AT_SYMLINK_NOFOLLOW) != 0) {
-    LOG(INFO) << "FILE IS GONE: " << path << " " << errno;
+    VLOG(1) << "FILE IS GONE: " << path << " " << errno;
     // The file is gone
     result->erase(absoluteToRelative(path));
     fd.set_deleted(true);
     if (handler != NULL) {
-      LOG(INFO) << "UPDATING METADATA: " << path;
+      VLOG(1) << "UPDATING METADATA: " << path;
       handler->metadataUpdated(absoluteToRelative(path), fd);
     }
 
@@ -222,11 +222,11 @@ FileData ServerFileSystem::scanNode(const string& path,
     }
   }
 
-  LOG(INFO) << "SETTING: " << absoluteToRelative(path);
+  VLOG(1) << "SETTING: " << absoluteToRelative(path);
   (*result)[absoluteToRelative(path)] = fd;
 
   if (handler != NULL) {
-    LOG(INFO) << "UPDATING METADATA: " << path;
+    VLOG(1) << "UPDATING METADATA: " << path;
     handler->metadataUpdated(absoluteToRelative(path), fd);
   }
 
