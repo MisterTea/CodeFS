@@ -3,15 +3,16 @@
 namespace codefs {
 ZmqBiDirectionalRpc::ZmqBiDirectionalRpc(const string& _address, bool _bind)
     : BiDirectionalRpc(true), address(_address), bind(_bind) {
-  context = shared_ptr<zmq::context_t>(new zmq::context_t(4, 16));
-  socket =
-      shared_ptr<zmq::socket_t>(new zmq::socket_t(*(context.get()), ZMQ_PAIR));
-  socket->setsockopt(ZMQ_LINGER, 3000);
+  context = shared_ptr<zmq::context_t>(new zmq::context_t(8));
   if (bind) {
     LOG(INFO) << "Binding on address: " << address;
+    socket = shared_ptr<zmq::socket_t>(
+        new zmq::socket_t(*(context.get()), ZMQ_ROUTER));
     socket->bind(address);
   } else {
     LOG(INFO) << "Connecting to address: " << address;
+    socket = shared_ptr<zmq::socket_t>(
+        new zmq::socket_t(*(context.get()), ZMQ_DEALER));
     socket->connect(address);
   }
   LOG(INFO) << "Done";
@@ -40,12 +41,28 @@ void ZmqBiDirectionalRpc::update() {
     zmq::message_t message;
     bool result = socket->recv(&message, ZMQ_DONTWAIT);
     FATAL_IF_FALSE_NOT_EAGAIN(result);
-    if (message.more()) {
-      LOG(FATAL) << "DID NOT GET ALL";
-    }
     if (!result) {
       // Nothing to recieve
       return;
+    }
+    // The identity
+    if (bind) {
+      if (clientIdentity != message) {
+        LOG(INFO) << "Got a new client: "
+                  << string(message.data<char>(), message.size()) << " "
+                  << message.size();
+        clientIdentity.copy(&message);
+      }
+    }
+    if (!message.more()) {
+      LOG(FATAL) << "Expected more data!";
+    }
+
+    // The data
+    FATAL_IF_FALSE(socket->recv(&message));
+    LOG(INFO) << message.size();
+    if (message.more()) {
+      LOG(FATAL) << "DID NOT GET ALL";
     }
 
     VLOG(1) << "Got message with size " << message.size() << endl;
@@ -76,19 +93,16 @@ void ZmqBiDirectionalRpc::send(const string& message) {
   if (message.length() == 0) {
     LOG(FATAL) << "Invalid message size";
   }
-  zmq::message_t zmqMessage(message.c_str(), message.length());
-  auto startSendTime = time(NULL);
-  while (true) {
-    bool retval = socket->send(zmqMessage);  //, ZMQ_DONTWAIT);
-    if (retval) {
-      break;
+  if (bind) {
+    if (clientIdentity.size() == 0) {
+      // no one to send to
+      LOG(INFO) << "No one to send to!";
+      return;
     }
-    FATAL_IF_FALSE_NOT_EAGAIN(retval);
-    usleep(100 * 1000);
-    if (startSendTime + 5 < time(NULL)) {
-      reconnect();
-      startSendTime = time(NULL);
-    }
+    FATAL_IF_FALSE(socket->send(clientIdentity, ZMQ_SNDMORE));
+    FATAL_IF_FALSE(socket->send(zmq::message_t(), ZMQ_SNDMORE));
   }
+  zmq::message_t zmqMessage(message.c_str(), message.length());
+  FATAL_IF_FALSE(socket->send(zmqMessage));
 }
 }  // namespace codefs

@@ -17,6 +17,8 @@ class ZmqBiDirectionalRpc : public BiDirectionalRpc {
   shared_ptr<zmq::context_t> context;
   shared_ptr<zmq::socket_t> socket;
 
+  zmq::message_t clientIdentity;
+
   string address;
   bool bind;
 
