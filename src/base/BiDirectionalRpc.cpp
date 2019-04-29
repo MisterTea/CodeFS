@@ -229,29 +229,27 @@ void BiDirectionalRpc::sendRequest(const IdPayload& idPayload) {
   writer.writePrimitive<unsigned char>(REQUEST);
   writer.writeClass<RpcId>(idPayload.id);
   writer.writePrimitive<string>(idPayload.payload);
-  if (!reliable) {
-    // Try to attach more requests to this packet
-    int i = 0;
-    while (!outgoingRequests.empty() &&
-           rpcsSent.size() < outgoingRequests.size()) {
-      DRAW_FROM_UNORDERED(it, outgoingRequests);
-      if (rpcsSent.find(it->id) != rpcsSent.end()) {
-        // Drew an rpc that's already in the packet.  Just bail for now, maybe
-        // in the future do something more clever.
-        break;
-      }
-      int size = sizeof(RpcId) + it->payload.length();
-      if (size + writer.size() > 400) {
-        // Too big
-        break;
-      }
-      i++;
-      rpcsSent.insert(it->id);
-      writer.writeClass<RpcId>(it->id);
-      writer.writePrimitive<string>(it->payload);
+  // Try to attach more requests to this packet
+  int i = 0;
+  while (!outgoingRequests.empty() &&
+         rpcsSent.size() < outgoingRequests.size()) {
+    DRAW_FROM_UNORDERED(it, outgoingRequests);
+    if (rpcsSent.find(it->id) != rpcsSent.end()) {
+      // Drew an rpc that's already in the packet.  Just bail for now, maybe
+      // in the future do something more clever.
+      break;
     }
-    VLOG(1) << "Attached " << i << " extra packets";
+    int size = sizeof(RpcId) + it->payload.length();
+    if (size + writer.size() > 400) {
+      // Too big
+      break;
+    }
+    i++;
+    rpcsSent.insert(it->id);
+    writer.writeClass<RpcId>(it->id);
+    writer.writePrimitive<string>(it->payload);
   }
+  VLOG(1) << "Attached " << i << " extra packets";
   send(writer.finish());
 }
 
@@ -265,29 +263,26 @@ void BiDirectionalRpc::sendReply(const IdPayload& idPayload) {
   writer.writePrimitive<unsigned char>(REPLY);
   writer.writeClass<RpcId>(idPayload.id);
   writer.writePrimitive<string>(idPayload.payload);
-  if (!reliable) {
-    // Try to attach more requests to this packet
-    int i = 0;
-    while (!outgoingReplies.empty() &&
-           rpcsSent.size() < outgoingReplies.size()) {
-      DRAW_FROM_UNORDERED(it, outgoingReplies);
-      if (rpcsSent.find(it->id) != rpcsSent.end()) {
-        // Drew an rpc that's already in the packet.  Just bail for now, maybe
-        // in the future do something more clever.
-        break;
-      }
-      int size = sizeof(RpcId) + it->payload.length();
-      if (size + writer.size() > 400) {
-        // Too big
-        break;
-      }
-      i++;
-      rpcsSent.insert(it->id);
-      writer.writeClass<RpcId>(it->id);
-      writer.writePrimitive<string>(it->payload);
+  // Try to attach more requests to this packet
+  int i = 0;
+  while (!outgoingReplies.empty() && rpcsSent.size() < outgoingReplies.size()) {
+    DRAW_FROM_UNORDERED(it, outgoingReplies);
+    if (rpcsSent.find(it->id) != rpcsSent.end()) {
+      // Drew an rpc that's already in the packet.  Just bail for now, maybe
+      // in the future do something more clever.
+      break;
     }
-    VLOG(1) << "Attached " << i << " extra packets";
+    int size = sizeof(RpcId) + it->payload.length();
+    if (size + writer.size() > 400) {
+      // Too big
+      break;
+    }
+    i++;
+    rpcsSent.insert(it->id);
+    writer.writeClass<RpcId>(it->id);
+    writer.writePrimitive<string>(it->payload);
   }
+  VLOG(1) << "Attached " << i << " extra packets";
   send(writer.finish());
 }
 
