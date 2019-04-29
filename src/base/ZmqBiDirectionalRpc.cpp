@@ -3,7 +3,7 @@
 namespace codefs {
 ZmqBiDirectionalRpc::ZmqBiDirectionalRpc(const string& _address, bool _bind)
     : BiDirectionalRpc(true), address(_address), bind(_bind) {
-  context = shared_ptr<zmq::context_t>(new zmq::context_t(4));
+  context = shared_ptr<zmq::context_t>(new zmq::context_t(4, 16));
   socket =
       shared_ptr<zmq::socket_t>(new zmq::socket_t(*(context.get()), ZMQ_PAIR));
   socket->setsockopt(ZMQ_LINGER, 3000);
@@ -55,6 +55,9 @@ void ZmqBiDirectionalRpc::update() {
 }
 
 void ZmqBiDirectionalRpc::reconnect() {
+  // Skip reconnect
+  return;
+
   shutdown();
 
   context = shared_ptr<zmq::context_t>(new zmq::context_t(4));
@@ -76,7 +79,7 @@ void ZmqBiDirectionalRpc::send(const string& message) {
   zmq::message_t zmqMessage(message.c_str(), message.length());
   auto startSendTime = time(NULL);
   while (true) {
-    bool retval = socket->send(zmqMessage, ZMQ_DONTWAIT);
+    bool retval = socket->send(zmqMessage);  //, ZMQ_DONTWAIT);
     if (retval) {
       break;
     }
