@@ -22,8 +22,7 @@ static const struct fuse_opt codefs_opts[] = {
 
 void runFuse(char *binaryLocation, shared_ptr<Client> client,
              shared_ptr<ClientFileSystem> fileSystem) {
-  vector<string> fuseFlags = {binaryLocation,
-                              FLAGS_mountpoint.c_str()};  //, "-s"};
+  vector<string> fuseFlags = {binaryLocation, FLAGS_mountpoint.c_str(), "-s"};
 #if __APPLE__
   // OSXFUSE has a timeout in the kernel.  Because we can block on network
   // failure, we disable this timeout
