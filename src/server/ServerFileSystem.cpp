@@ -47,7 +47,7 @@ void ServerFileSystem::scanRecursively(
     const string& path_string, shared_ptr<ctpl::thread_pool> scanThreadPool) {
   bool waitUntilFinished = false;
   if (scanThreadPool.get() == NULL) {
-    scanThreadPool.reset(new ctpl::thread_pool(8));
+    // scanThreadPool.reset(new ctpl::thread_pool(8));
     waitUntilFinished = true;
   }
 
