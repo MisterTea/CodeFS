@@ -48,9 +48,8 @@ void ZmqBiDirectionalRpc::update() {
     // The identity
     if (bind) {
       if (clientIdentity != message) {
-        LOG(INFO) << "Got a new client: "
-                  << string(message.data<char>(), message.size()) << " "
-                  << message.size();
+        LOG(INFO) << "Got a new client: " << clientIdentity.str()
+                  << " != " << message.str();
         clientIdentity.rebuild(message.data(), message.size());
       }
     }
@@ -98,7 +97,9 @@ void ZmqBiDirectionalRpc::send(const string& message) {
       LOG(INFO) << "No one to send to!";
       return;
     }
-    FATAL_IF_FALSE(socket->send(clientIdentity, ZMQ_SNDMORE));
+    FATAL_IF_FALSE(socket->send(
+        zmq::message_t(clientIdentity.data(), clientIdentity.size()),
+        ZMQ_SNDMORE));
     FATAL_IF_FALSE(socket->send(zmq::message_t(), ZMQ_SNDMORE));
   }
   zmq::message_t zmqMessage(message.c_str(), message.length());
