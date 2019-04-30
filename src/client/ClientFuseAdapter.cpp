@@ -504,7 +504,7 @@ void ClientFuseAdapter::assignCallbacks(
   ops->getxattr = codefs_getxattr_osx;
 #else
   ops->setxattr = codefs_setxattr;
-  ops->getxattr = codefs_setxattr;
+  ops->getxattr = codefs_getxattr;
 #endif
   ops->removexattr = codefs_removexattr;
 }
