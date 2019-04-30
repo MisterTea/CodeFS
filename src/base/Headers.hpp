@@ -75,6 +75,8 @@ extern "C" {
 
 #include <gflags/gflags.h>
 
+#include "ctpl_stl.h"
+
 #include "SimpleIni.h"
 
 #include "easylogging++.h"

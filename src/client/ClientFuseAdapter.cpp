@@ -29,7 +29,7 @@ unordered_map<int64_t, DirectoryPointer *> dirpMap;
 static void *codefs_init(struct fuse_conn_info *conn) { return NULL; }
 
 static int codefs_access(const char *path, int mask) {
-  LOG(INFO) << "CHECKING ACCESS FOR " << path << " " << mask;
+  VLOG(1) << "CHECKING ACCESS FOR " << path << " " << mask;
   optional<FileData> fileData = client->getNode(path);
   if (!fileData) {
     LOG(INFO) << "FILE DOESN'T EXIST";
@@ -85,66 +85,9 @@ static int codefs_readlink(const char *path, char *buf, size_t size) {
   return 0;
 }
 
-static int codefs_opendir(const char *path, struct fuse_file_info *fi) {
-  LOG(INFO) << "OPENING DIRECTORY AT PATH: " << path;
-  DirectoryPointer *d = new DirectoryPointer(string(path));
-  if (d == NULL) return -ENOMEM;
-
-  if (client->hasDirectory(path) == false) {
-    return -ENOENT;
-  }
-  dirpMap.insert(make_pair((unsigned long)d, d));
-  fi->fh = (unsigned long)d;
-
-  return 0;
-}
-
-static inline DirectoryPointer *get_dirp(fuse_file_info *fi) {
-  auto it = dirpMap.find((unsigned long)(fi->fh));
-  if (it == dirpMap.end()) {
-    LOG(FATAL) << "Unable to find directory pointer: " << fi->fh;
-  }
-  return it->second;
-}
-
 static int codefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
                           off_t offset, struct fuse_file_info *fi) {
-#if 0
-  LOG(INFO) << "READING DIRECTORY AT PATH: " << path;
-  DirectoryPointer *d = get_dirp(fi);
-
-  LOG(INFO) << "OFFSET: " << offset;
-  if (offset != d->offset) {
-    d->offset = offset;
-  }
-  optional<FileData> node;
-  vector<FileData> children;
-  node = client->getNodeAndChildren(d->directory, &children);
-  if (!node) {
-    // Directory is gone
-    LOG(INFO) << "DIRECTORY IS GONE";
-    return 0;
-  }
-  while (1) {
-    LOG(INFO) << "NUM CHILDREN: " << children.size();
-    if (children.size() <= d->offset) {
-      break;
-    }
-    const auto &child = children.at(d->offset);
-    string fileName = boost::filesystem::path(child.path()).filename().string();
-    LOG(INFO) << "CHILD: " << fileName;
-
-    struct stat st;
-    memset(&st, 0, sizeof(struct stat));
-    FileSystem::protoToStat(child.stat_data(), &st);
-    if (filler(buf, fileName.c_str(), &st, d->offset + 1)) break;
-    (d->offset)++;
-  }
-
-  LOG(INFO) << "TRIED TO READ TOO MUCH";
-  return 0;
-#endif
-  LOG(INFO) << "READING DIRECTORY AT PATH: " << path;
+  VLOG(1) << "READING DIRECTORY AT PATH: " << path;
   if (client->hasDirectory(path) == false) {
     return -ENOENT;
   }
@@ -161,17 +104,6 @@ static int codefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
       break;
     }
   }
-  return 0;
-}
-
-static int codefs_releasedir(const char *path, struct fuse_file_info *fi) {
-  LOG(INFO) << "RELEASING DIRECTORY AT PATH: " << path;
-  DirectoryPointer *d = get_dirp(fi);
-  if (dirpMap.find((unsigned long)d) == dirpMap.end()) {
-    LOG(FATAL) << "Tried to remove a directory from the map that didn't exist!";
-  }
-  dirpMap.erase((unsigned long)d);
-  delete d;
   return 0;
 }
 
@@ -566,10 +498,13 @@ void ClientFuseAdapter::assignCallbacks(
   ops->write = codefs_write;
   ops->statfs = codefs_statfs;
   ops->release = codefs_release;
+  ops->listxattr = codefs_listxattr;
 #if __APPLE__
   ops->setxattr = codefs_setxattr_osx;
+  ops->getxattr = codefs_getxattr_osx;
 #else
   ops->setxattr = codefs_setxattr;
+  ops->getxattr = codefs_setxattr;
 #endif
   ops->removexattr = codefs_removexattr;
 }

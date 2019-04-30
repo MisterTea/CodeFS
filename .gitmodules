@@ -4,3 +4,6 @@
 [submodule "external/simpleini"]
 	path = external/simpleini
 	url = https://github.com/brofield/simpleini.git
+[submodule "external/CTPL"]
+	path = external/CTPL
+	url = https://github.com/vit-vit/CTPL.git

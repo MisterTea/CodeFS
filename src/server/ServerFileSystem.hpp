@@ -58,7 +58,7 @@ class ServerFileSystem : public FileSystem {
     }
 
     // Begin recursive scan to pick up new children
-    scanRecursively(absolutePath, &allFileData);
+    scanRecursively(absolutePath);
   }
 
   string readFile(const string &path);
@@ -143,9 +143,9 @@ class ServerFileSystem : public FileSystem {
   }
 
   void scanRecursively(const string &path,
-                       unordered_map<string, FileData> *result);
-  FileData scanNode(const string &path,
-                    unordered_map<string, FileData> *result);
+                       shared_ptr<ctpl::thread_pool> scanThreadPool =
+                           shared_ptr<ctpl::thread_pool>());
+  void scanNode(const string &path);
 
  protected:
   bool initialized;

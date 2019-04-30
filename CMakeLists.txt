@@ -83,6 +83,7 @@ include_directories(
   external/msgpack-3.0.1/include
   external/Optional
   external/simpleini
+  external/CTPL
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${GFLAGS_INCLUDE_DIRS}

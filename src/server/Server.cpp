@@ -34,8 +34,8 @@ int Server::update() {
     }
     reader.load(payload);
     unsigned char header = reader.readPrimitive<unsigned char>();
-    LOG(INFO) << "CONSUMING REQUEST: " << id.str() << ": " << int(header) << " "
-              << payload.size();
+    VLOG(1) << "CONSUMING REQUEST: " << id.str() << ": " << int(header) << " "
+            << payload.size();
     switch (header) {
       case CLIENT_SERVER_CREATE_FILE: {
         string path = reader.readPrimitive<string>();
@@ -170,7 +170,7 @@ int Server::update() {
       } break;
       case CLIENT_SERVER_FETCH_METADATA: {
         string path = reader.readPrimitive<string>();
-        LOG(INFO) << "Fetching Metadata for " << path;
+        VLOG(1) << "Fetching Metadata for " << path;
         auto s = fileSystem->serializeFileDataCompressed(path);
         writer.start();
         writer.writePrimitive<string>(path);
