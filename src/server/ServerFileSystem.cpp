@@ -50,6 +50,7 @@ void ServerFileSystem::scanRecursively(
     scanThreadPool.reset(new ctpl::thread_pool(8));
     waitUntilFinished = true;
   }
+
   std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
   VLOG(1) << "SCANNING DIRECTORY " << path_string;
   scanNode(path_string);
@@ -63,7 +64,7 @@ void ServerFileSystem::scanRecursively(
       if (boost::filesystem::is_symlink(p.path()) ||
           boost::filesystem::is_regular_file(p.path())) {
         // LOG(INFO) << "SCANNING FILE " << p_str;
-        scanThreadPool->push([this, p_str](int id) { this->scanNode(p_str); });
+        this->scanNode(p_str);
       } else if (boost::filesystem::is_directory(p.path())) {
         scanRecursively(p_str, scanThreadPool);
       } else {
