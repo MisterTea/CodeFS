@@ -146,14 +146,6 @@ static int codefs_getxattr(const char *path, const char *name, char *value,
   return -ENOATTR;
 }
 
-static int codefs_getxattr_osx(const char *path, const char *name, char *value,
-                               size_t size, uint32_t position) {
-  if (position) {
-    LOG(FATAL) << "Got a non-zero position: " << position;
-  }
-  return codefs_getxattr(path, name, value, size);
-}
-
 static int codefs_fsync(const char *, int, struct fuse_file_info *) {
   return 0;
 }
@@ -451,6 +443,15 @@ static int codefs_setxattr(const char *path, const char *name,
   return 0;
 }
 
+#if __APPLE__
+static int codefs_getxattr_osx(const char *path, const char *name, char *value,
+                               size_t size, uint32_t position) {
+  if (position) {
+    LOG(FATAL) << "Got a non-zero position: " << position;
+  }
+  return codefs_getxattr(path, name, value, size);
+}
+
 static int codefs_setxattr_osx(const char *path, const char *name,
                                const char *value, size_t size, int flags,
                                uint32_t position) {
@@ -459,6 +460,7 @@ static int codefs_setxattr_osx(const char *path, const char *name,
   }
   return codefs_setxattr(path, name, value, size, flags);
 }
+#endif
 
 void ClientFuseAdapter::assignCallbacks(
     shared_ptr<ClientFileSystem> _fileSystem, shared_ptr<Client> _client,
