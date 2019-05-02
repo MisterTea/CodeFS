@@ -51,6 +51,10 @@ void ServerFileSystem::scanRecursively(
     waitUntilFinished = true;
   }
 
+  boost::filesystem::path pt(path_string);
+  if (!exists(pt)) {
+    return;
+  }
   auto path =
       boost::filesystem::canonical(boost::filesystem::path(path_string));
   if (excludes.find(path) != excludes.end()) {
@@ -61,8 +65,7 @@ void ServerFileSystem::scanRecursively(
   VLOG(1) << "SCANNING DIRECTORY " << path_string;
   scanNode(path_string);
 
-  boost::filesystem::path pt(path_string);
-  if (exists(pt) && boost::filesystem::is_directory(pt)) {
+  if (boost::filesystem::is_directory(pt)) {
     // path exists
     for (auto& p : boost::make_iterator_range(
              boost::filesystem::directory_iterator(pt), {})) {
@@ -79,8 +82,7 @@ void ServerFileSystem::scanRecursively(
       }
     }
   } else {
-    LOG(INFO) << "path " << path_string
-              << "doesn't exist or isn't a directory!";
+    LOG(INFO) << "path " << path_string << "isn't a directory!";
   }
 
   VLOG(1) << "RECURSIVE SCAN FINISHED";
@@ -90,7 +92,10 @@ void ServerFileSystem::scanRecursively(
 }
 
 void ServerFileSystem::scanNode(const string& path) {
-  auto pathObj = boost::filesystem::canonical(boost::filesystem::path(path));
+  auto pathObj = boost::filesystem::path(path);
+  if (exists(pathObj)) {
+    pathObj = boost::filesystem::canonical(pathObj);
+  }
   if (excludes.find(pathObj) != excludes.end()) {
     return;
   }
