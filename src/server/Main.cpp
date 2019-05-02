@@ -143,6 +143,7 @@ int main(int argc, char *argv[]) {
   usleep(100 * 1000);
 
   fileSystem->init();
+  LOG(INFO) << "Server filesystem initialized";
 
   fileSystem->setHandler(server.get());
   server->init();
