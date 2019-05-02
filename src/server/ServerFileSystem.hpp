@@ -13,7 +13,7 @@ class ServerFileSystem : public FileSystem {
   };
 
   explicit ServerFileSystem(const string &_rootPath,
-                            const vector<string> &_excludes);
+                            const set<boost::filesystem::path> &_excludes);
   virtual ~ServerFileSystem() {}
 
   void init();
@@ -150,7 +150,7 @@ class ServerFileSystem : public FileSystem {
  protected:
   bool initialized;
   Handler *handler;
-  vector<string> excludes;
+  set<boost::filesystem::path> excludes;
 };
 }  // namespace codefs
 

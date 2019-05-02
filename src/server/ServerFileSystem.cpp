@@ -1,8 +1,8 @@
 #include "ServerFileSystem.hpp"
 
 namespace codefs {
-ServerFileSystem::ServerFileSystem(const string& _rootPath,
-                                   const vector<string>& _excludes)
+ServerFileSystem::ServerFileSystem(
+    const string& _rootPath, const set<boost::filesystem::path>& _excludes)
     : FileSystem(_rootPath),
       initialized(false),
       handler(NULL),
@@ -51,6 +51,12 @@ void ServerFileSystem::scanRecursively(
     waitUntilFinished = true;
   }
 
+  auto path =
+      boost::filesystem::canonical(boost::filesystem::path(path_string));
+  if (excludes.find(path) != excludes.end()) {
+    return;
+  }
+
   std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
   VLOG(1) << "SCANNING DIRECTORY " << path_string;
   scanNode(path_string);
@@ -84,6 +90,11 @@ void ServerFileSystem::scanRecursively(
 }
 
 void ServerFileSystem::scanNode(const string& path) {
+  auto pathObj = boost::filesystem::canonical(boost::filesystem::path(path));
+  if (excludes.find(pathObj) != excludes.end()) {
+    return;
+  }
+
   FileData fd;
   {
     std::lock_guard<std::recursive_mutex> lock(fileDataMutex);

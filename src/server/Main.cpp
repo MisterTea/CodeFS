@@ -104,15 +104,33 @@ int main(int argc, char *argv[]) {
   // Check for .codefs config
   auto cfgPath =
       boost::filesystem::path(FLAGS_path) / boost::filesystem::path(".codefs");
-  vector<string> excludes;
+  set<boost::filesystem::path> excludes;
   if (boost::filesystem::exists(cfgPath)) {
     CSimpleIniA ini(true, true, true);
     SI_Error rc = ini.LoadFile(cfgPath.string().c_str());
     if (rc == 0) {
-      excludes = split(ini.GetValue("Scanner", "Excludes", NULL), ',');
+      auto relativeExcludes =
+          split(ini.GetValue("Scanner", "Excludes", NULL), ',');
+      for (auto exclude : relativeExcludes) {
+        excludes.insert(boost::filesystem::path(FLAGS_path) / exclude);
+      }
     } else {
       LOG(FATAL) << "Invalid ini file: " << cfgPath;
     }
+  }
+
+  // Check for .watchmanconfig and update excludes
+  auto pathToCheck = boost::filesystem::path(FLAGS_path);
+  while (true) {
+    auto cfgPath = pathToCheck / boost::filesystem::path(".watchmanconfig");
+    if (boost::filesystem::exists(cfgPath)) {
+      auto configJson = json::parse(fileToStr(cfgPath.string()));
+      for (auto ignoreDir : configJson["ignore_dirs"]) {
+        excludes.insert(pathToCheck / ignoreDir.get<std::string>());
+      }
+      break;
+    }
+    pathToCheck = pathToCheck.parent_path();
   }
 
   shared_ptr<ServerFileSystem> fileSystem(
