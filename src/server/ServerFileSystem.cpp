@@ -93,13 +93,13 @@ void ServerFileSystem::scanRecursively(
 
 void ServerFileSystem::scanNode(const string& path) {
   auto pathObj = boost::filesystem::path(path);
-  if (exists(pathObj)) {
-    try {
+  try {
+    if (exists(pathObj)) {
       pathObj = boost::filesystem::canonical(pathObj);
-    } catch (const boost::filesystem::filesystem_error& ex) {
-      // Can happen for self-referencing symbolic links
-      LOG(ERROR) << "Error resolving file: " << ex.what();
     }
+  } catch (const boost::filesystem::filesystem_error& ex) {
+    // Can happen for self-referencing symbolic links
+    LOG(ERROR) << "Error resolving file: " << ex.what();
   }
   if (excludes.find(pathObj) != excludes.end()) {
     return;
