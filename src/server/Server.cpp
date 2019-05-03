@@ -169,12 +169,15 @@ int Server::update() {
         }
       } break;
       case CLIENT_SERVER_FETCH_METADATA: {
-        string path = reader.readPrimitive<string>();
-        VLOG(1) << "Fetching Metadata for " << path;
-        auto s = fileSystem->serializeFileDataCompressed(path);
+        int numPaths = reader.readPrimitive<int>();
         writer.start();
-        writer.writePrimitive<string>(path);
-        writer.writePrimitive<string>(s);
+        for (int a = 0; a < numPaths; a++) {
+          string path = reader.readPrimitive<string>();
+          VLOG(1) << "Fetching Metadata for " << path;
+          auto s = fileSystem->serializeFileDataCompressed(path);
+          writer.writePrimitive<string>(path);
+          writer.writePrimitive<string>(s);
+        }
         reply(id, writer.finish());
       } break;
       case CLIENT_SERVER_MKDIR: {

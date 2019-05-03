@@ -130,6 +130,9 @@ int main(int argc, char *argv[]) {
       }
       break;
     }
+    if (pathToCheck == "/") {
+      break;
+    }
     pathToCheck = pathToCheck.parent_path();
   }
 

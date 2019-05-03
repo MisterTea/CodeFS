@@ -12,6 +12,7 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
       shared_ptr<ZmqBiDirectionalRpc>(new ZmqBiDirectionalRpc(address, false));
   writer.start();
   writer.writePrimitive<unsigned char>(CLIENT_SERVER_FETCH_METADATA);
+  writer.writePrimitive<int>(1);
   writer.writePrimitive<string>(string("/"));
   RpcId initId = rpc->request(writer.finish());
 
@@ -75,71 +76,110 @@ int Client::update() {
   return 0;
 }
 
-optional<FileData> Client::getNode(const string& path) {
-  MessageReader reader;
-  MessageWriter writer;
-  vector<string> pathsToDownload = fileSystem->getPathsToDownload(path);
-  for (const auto& it : pathsToDownload) {
-    VLOG(2) << "GETTING SCAN FOR PATH: " << it;
-    string payload;
+vector<optional<FileData>> Client::getNodes(const vector<string>& paths) {
+  vector<RpcId> rpcIds;
+  string payload;
+  vector<string> metadataToFetch;
+  for (auto path : paths) {
+    vector<string> pathsToDownload = fileSystem->getPathsToDownload(path);
+    LOG(INFO) << "Number of paths: " << pathsToDownload.size();
+    for (auto it : pathsToDownload) {
+      LOG(INFO) << "GETTING SCAN FOR PATH: " << it;
+      metadataToFetch.push_back(it);
+    }
+  }
+
+  if (!metadataToFetch.empty()) {
+    RpcId id;
     {
       lock_guard<std::recursive_mutex> lock(rpcMutex);
+      MessageWriter writer;
       writer.start();
       writer.writePrimitive<unsigned char>(CLIENT_SERVER_FETCH_METADATA);
-      writer.writePrimitive<string>(it);
+      writer.writePrimitive<int>(metadataToFetch.size());
+      for (auto s : metadataToFetch) {
+        writer.writePrimitive<string>(s);
+      }
       payload = writer.finish();
+      id = rpc->request(payload);
     }
-    string result = fileRpc(payload);
-    {
-      lock_guard<std::recursive_mutex> lock(rpcMutex);
-      reader.load(result);
-      auto path = reader.readPrimitive<string>();
-      auto data = reader.readPrimitive<string>();
-      fileSystem->deserializeFileDataCompressed(path, data);
-    }
-  }
-  for (int waitTicks = 0;; waitTicks++) {
-    auto node = fileSystem->getNode(path);
-    if (node) {
-      bool invalid = node->invalid();
-      if (!invalid) {
-        return node;
-      } else {
-        LOG(INFO) << path
-                  << " is invalid, waiting for new version: " << waitTicks;
-        if (((waitTicks + 1) % 10) == 0) {
-          LOG(ERROR)
-              << path
-              << " is invalid for too long, demanding new version from server";
-          string payload;
-          {
-            lock_guard<std::recursive_mutex> lock(rpcMutex);
-            writer.start();
-            writer.writePrimitive<unsigned char>(CLIENT_SERVER_FETCH_METADATA);
-            writer.writePrimitive<string>(path);
-            payload = writer.finish();
-          }
-          string result = fileRpc(payload);
-          {
-            lock_guard<std::recursive_mutex> lock(rpcMutex);
-            reader.load(result);
-            auto path = reader.readPrimitive<string>();
-            auto data = reader.readPrimitive<string>();
-            fileSystem->deserializeFileDataCompressed(path, data);
-          }
-        } else {
-          usleep(100 * 1000);
+    rpcIds.push_back(id);
+    string result;
+    while (true) {
+      usleep(1000);
+      {
+        lock_guard<std::recursive_mutex> lock(rpcMutex);
+        if (rpc->hasIncomingReplyWithId(id)) {
+          result = rpc->consumeIncomingReplyWithId(id);
+          break;
         }
       }
-    } else {
-      return node;
+    }
+    {
+      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      MessageReader reader;
+      reader.load(result);
+      while (reader.sizeRemaining()) {
+        auto path = reader.readPrimitive<string>();
+        auto data = reader.readPrimitive<string>();
+        fileSystem->deserializeFileDataCompressed(path, data);
+      }
     }
   }
+
+  vector<optional<FileData>> retval;
+  for (const auto& path : paths) {
+    for (int waitTicks = 0;; waitTicks++) {
+      auto node = fileSystem->getNode(path);
+      if (node) {
+        bool invalid = node->invalid();
+        if (!invalid) {
+          retval.push_back(node);
+          break;
+        } else {
+          LOG(INFO) << path
+                    << " is invalid, waiting for new version: " << waitTicks;
+          if (((waitTicks + 1) % 10) == 0) {
+            LOG(ERROR) << path
+                       << " is invalid for too long, demanding new version "
+                          "from server";
+            string payload;
+            {
+              lock_guard<std::recursive_mutex> lock(rpcMutex);
+              MessageWriter writer;
+              writer.start();
+              writer.writePrimitive<unsigned char>(
+                  CLIENT_SERVER_FETCH_METADATA);
+              writer.writePrimitive<int>(1);
+              writer.writePrimitive<string>(path);
+              payload = writer.finish();
+            }
+            string result = fileRpc(payload);
+            {
+              lock_guard<std::recursive_mutex> lock(rpcMutex);
+              MessageReader reader;
+              reader.load(result);
+              auto path = reader.readPrimitive<string>();
+              auto data = reader.readPrimitive<string>();
+              fileSystem->deserializeFileDataCompressed(path, data);
+            }
+          } else {
+            usleep(100 * 1000);
+          }
+        }
+      } else {
+        retval.push_back(node);
+        break;
+      }
+    }
+  }
+  return retval;
 }
 
 optional<FileData> Client::getNodeAndChildren(const string& path,
                                               vector<FileData>* children) {
   auto parentNode = getNode(path);
+  vector<string> childrenPaths;
   if (parentNode) {
     // Check the children
     LOG(INFO) << "NUM CHILDREN: " << parentNode->child_node_size();
@@ -149,10 +189,15 @@ optional<FileData> Client::getNodeAndChildren(const string& path,
       string childPath = (boost::filesystem::path(parentNode->path()) /
                           boost::filesystem::path(fileName))
                              .string();
+      childrenPaths.push_back(childPath);
+    }
 
-      auto childNode = getNode(childPath);
-      if (childNode) {
-        children->push_back(*childNode);
+    if (!childrenPaths.empty()) {
+      auto childNodes = getNodes(childrenPaths);
+      for (auto childNode : childNodes) {
+        if (childNode) {
+          children->push_back(*childNode);
+        }
       }
     }
   }

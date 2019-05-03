@@ -26,7 +26,8 @@ class Client {
     rpc->heartbeat();
   }
 
-  optional<FileData> getNode(const string& path);
+  optional<FileData> getNode(const string& path) { return getNodes({path})[0]; }
+  vector<optional<FileData>> getNodes(const vector<string>& paths);
   optional<FileData> getNodeAndChildren(const string& path,
                                         vector<FileData>* children);
   inline bool hasDirectory(const string& path) {

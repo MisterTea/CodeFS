@@ -56,15 +56,15 @@ class ClientFileSystem : public FileSystem {
       if (fd.child_node_size() == 0) {
         return {};
       }
-      bool haveChildren = true;
+      bool haveAllChildren = true;
       for (const auto& childName : fd.child_node()) {
         auto childPath = (boost::filesystem::path(path) / childName).string();
         if (allFileData.find(childPath) == allFileData.end()) {
-          haveChildren = false;
+          haveAllChildren = false;
           break;
         }
       }
-      if (haveChildren) {
+      if (haveAllChildren) {
         return {};
       } else {
         return {path};
