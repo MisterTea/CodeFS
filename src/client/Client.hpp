@@ -6,23 +6,12 @@
 #include "ZmqBiDirectionalRpc.hpp"
 
 namespace codefs {
-struct OwnedFileInfo {
-  unordered_set<int> fds;
-  string content;
-  bool readOnly;
-
-  OwnedFileInfo(int fd, string _content, bool _readOnly)
-      : content(_content), readOnly(_readOnly) {
-    fds.insert(fd);
-  }
-};
-
 class Client {
  public:
   Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem);
   int update();
   inline void heartbeat() {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     rpc->heartbeat();
   }
 
@@ -60,21 +49,14 @@ class Client {
                 int64_t size, int flags);
 
   optional<int64_t> getSizeOverride(const string& path) {
-    auto it = ownedFileContents.find(path);
-    if (it == ownedFileContents.end()) {
-      return optional<int64_t>();
-    }
-    return int64_t(it->second.content.size());
+    return fileSystem->getSizeOverride(path);
   }
 
  protected:
   string address;
   shared_ptr<ZmqBiDirectionalRpc> rpc;
   shared_ptr<ClientFileSystem> fileSystem;
-  unordered_map<string, OwnedFileInfo> ownedFileContents;
-  recursive_mutex rpcMutex;
-  optional<StatVfsData> cachedStatVfsProto;
-  int fdCounter;
+  recursive_mutex mutex;
   int twoPathsNoReturn(unsigned char header, const string& from,
                        const string& to);
   int singlePathNoReturn(unsigned char header, const string& path);

@@ -36,7 +36,6 @@ static int codefs_access(const char *path, int mask) {
     return -1 * ENOENT;
   }
   if (mask == 0) {
-    LOG(INFO) << "MASK IS 0";
     return 0;
   }
 
@@ -250,7 +249,7 @@ static int codefs_getattr(const char *path, struct stat *stbuf) {
     LOGFATAL << "Tried to getattr with a NULL stat object";
   }
 
-  LOG(INFO) << "GETTING ATTR FOR PATH: " << path;
+  VLOG(2) << "GETTING ATTR FOR PATH: " << path;
   optional<FileData> fileDataPtr = client->getNode(path);
   if (!fileDataPtr) {
     LOG(INFO) << "File doesn't exist";

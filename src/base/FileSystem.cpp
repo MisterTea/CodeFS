@@ -5,7 +5,7 @@
 
 namespace codefs {
 string FileSystem::serializeFileDataCompressed(const string& path) {
-  std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+  std::lock_guard<std::recursive_mutex> lock(mutex);
   MessageWriter writer;
   if (allFileData.find(path) == allFileData.end()) {
     writer.writePrimitive<int>(0);
@@ -25,7 +25,7 @@ string FileSystem::serializeFileDataCompressed(const string& path) {
 
 void FileSystem::deserializeFileDataCompressed(const string& path,
                                                const string& s) {
-  std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+  std::lock_guard<std::recursive_mutex> lock(mutex);
   MessageReader reader;
   reader.load(decompressString(s));
   int numFiles = reader.readPrimitive<int>();

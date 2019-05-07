@@ -11,7 +11,7 @@ class FileSystem {
   }
 
   virtual optional<FileData> getNode(const string &path) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     auto it = allFileData.find(path);
     if (it == allFileData.end()) {
       return nullopt;
@@ -20,7 +20,7 @@ class FileSystem {
   }
 
   void setNode(const FileData &fileData) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     allFileData.erase(fileData.path());
     if (fileData.deleted()) {
       // The node is deleted, Don't add
@@ -35,7 +35,7 @@ class FileSystem {
   }
 
   void createStub(const string &path) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     FileData stub;
     stub.set_path(path);
     stub.set_invalid(true);
@@ -43,7 +43,7 @@ class FileSystem {
   }
 
   void deleteNode(const string &path) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     auto it = allFileData.find(path);
     if (it != allFileData.end()) {
       allFileData.erase(it);
@@ -53,8 +53,8 @@ class FileSystem {
   virtual string absoluteToRelative(const string &absolutePath) {
     if (absolutePath.find(rootPath) != 0) {
       LOGFATAL << "Tried to convert absolute path to fuse that wasn't inside "
-                    "the absolute FS: "
-                 << absolutePath << " " << rootPath;
+                  "the absolute FS: "
+               << absolutePath << " " << rootPath;
     }
     string relative = absolutePath.substr(rootPath.size());
     if (relative.length() == 0) {
@@ -107,7 +107,7 @@ class FileSystem {
  protected:
   string rootPath;
   shared_ptr<thread> fuseThread;
-  std::recursive_mutex fileDataMutex;
+  std::recursive_mutex mutex;
 };
 }  // namespace codefs
 

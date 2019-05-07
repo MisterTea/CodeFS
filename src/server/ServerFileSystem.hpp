@@ -23,7 +23,7 @@ class ServerFileSystem : public FileSystem {
   void rescanPath(const string &absolutePath);
 
   inline void rescanPathAndParent(const string &absolutePath) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     rescanPath(absolutePath);
     if (absoluteToRelative(absolutePath) != string("/")) {
       LOG(INFO) << "RESCANNING PARENT";
@@ -32,7 +32,7 @@ class ServerFileSystem : public FileSystem {
   }
 
   inline void rescanPathAndParentAndChildren(const string &absolutePath) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     if (absoluteToRelative(absolutePath) != string("/")) {
       rescanPath(boost::filesystem::path(absolutePath).parent_path().string());
     }
@@ -40,7 +40,7 @@ class ServerFileSystem : public FileSystem {
   }
 
   inline void rescanPathAndChildren(const string &absolutePath) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     auto node = getNode(absolutePath);
     if (node) {
       // scan node and known children envelope for deletion/update
@@ -65,61 +65,61 @@ class ServerFileSystem : public FileSystem {
   int writeFile(const string &path, const string &fileContents);
 
   int mkdir(const string &path, mode_t mode) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     return ::mkdir(relativeToAbsolute(path).c_str(), mode);
   }
 
   int unlink(const string &path) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     return ::unlink(relativeToAbsolute(path).c_str());
   }
 
   int rmdir(const string &path) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     return ::rmdir(relativeToAbsolute(path).c_str());
   }
 
   int symlink(const string &from, const string &to) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     return ::symlink(relativeToAbsolute(from).c_str(),
                      relativeToAbsolute(to).c_str());
   }
 
   int link(const string &from, const string &to) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     return ::link(relativeToAbsolute(from).c_str(),
                   relativeToAbsolute(to).c_str());
   }
 
   int rename(const string &from, const string &to) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     return ::rename(relativeToAbsolute(from).c_str(),
                     relativeToAbsolute(to).c_str());
   }
 
   int chmod(const string &path, mode_t mode) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     int res = ::chmod(relativeToAbsolute(path).c_str(), mode);
     rescanPath(relativeToAbsolute(path));
     return res;
   }
 
   int lchown(const string &path, int64_t uid, int64_t gid) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     int res = ::lchown(relativeToAbsolute(path).c_str(), uid, gid);
     rescanPath(relativeToAbsolute(path));
     return res;
   }
 
   int truncate(const string &path, int64_t size) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     int res = ::truncate(relativeToAbsolute(path).c_str(), size);
     rescanPath(relativeToAbsolute(path));
     return res;
   }
 
   int utimensat(const string &path, struct timespec ts[2]) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     int res = ::utimensat(0, relativeToAbsolute(path).c_str(), ts,
                           AT_SYMLINK_NOFOLLOW);
     rescanPath(relativeToAbsolute(path));
@@ -127,7 +127,7 @@ class ServerFileSystem : public FileSystem {
   }
 
   int lremovexattr(const string &path, const string &name) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     int res = ::lremovexattr(relativeToAbsolute(path).c_str(), name.c_str());
     rescanPath(relativeToAbsolute(path));
     return res;
@@ -135,7 +135,7 @@ class ServerFileSystem : public FileSystem {
 
   int lsetxattr(const string &path, const string &name, const string &value,
                 int64_t size, int flags) {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     int res = ::lsetxattr(relativeToAbsolute(path).c_str(), name.c_str(),
                           value.c_str(), size, flags);
     rescanPath(relativeToAbsolute(path));

@@ -169,7 +169,7 @@ int main(int argc, char *argv[]) {
       server->heartbeat();
       lastHeartbeatTime = std::chrono::high_resolution_clock::now();
     }
-    usleep(0);
+    usleep(1);
   }
 }
 }  // namespace codefs

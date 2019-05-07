@@ -4,7 +4,7 @@
 
 namespace codefs {
 Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
-    : address(_address), fileSystem(_fileSystem), fdCounter(1) {
+    : address(_address), fileSystem(_fileSystem) {
   MessageReader reader;
   MessageWriter writer;
   rpc =
@@ -18,7 +18,7 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
   while (true) {
     LOG(INFO) << "Waiting for init...";
     {
-      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      lock_guard<std::recursive_mutex> lock(mutex);
       rpc->update();
       rpc->heartbeat();
       if (rpc->hasIncomingReplyWithId(initId)) {
@@ -37,7 +37,7 @@ Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
 int Client::update() {
   MessageReader reader;
   MessageWriter writer;
-  lock_guard<std::recursive_mutex> lock(rpcMutex);
+  lock_guard<std::recursive_mutex> lock(mutex);
   rpc->update();
 
   while (rpc->hasIncomingRequest()) {
@@ -50,7 +50,7 @@ int Client::update() {
       case SERVER_CLIENT_METADATA_UPDATE: {
         string path = reader.readPrimitive<string>();
         LOG(INFO) << "UPDATING PATH: " << path;
-        cachedStatVfsProto.reset();
+        fileSystem->invalidateVfsCache();
         FileData fileData = reader.readProto<FileData>();
         if (fileData.invalid()) {
           LOGFATAL << "Got filedata with invalid set";
@@ -83,7 +83,7 @@ vector<optional<FileData>> Client::getNodes(const vector<string>& paths) {
     vector<string> pathsToDownload = fileSystem->getPathsToDownload(path);
     VLOG(1) << "Number of paths: " << pathsToDownload.size();
     for (auto it : pathsToDownload) {
-      VLOG(1) << "GETTING SCAN FOR PATH: " << it;
+      LOG(INFO) << "GETTING SCAN FOR PATH: " << it;
       metadataToFetch.push_back(it);
     }
   }
@@ -91,7 +91,7 @@ vector<optional<FileData>> Client::getNodes(const vector<string>& paths) {
   if (!metadataToFetch.empty()) {
     RpcId id;
     {
-      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      lock_guard<std::recursive_mutex> lock(mutex);
       MessageWriter writer;
       writer.start();
       writer.writePrimitive<unsigned char>(CLIENT_SERVER_FETCH_METADATA);
@@ -105,9 +105,9 @@ vector<optional<FileData>> Client::getNodes(const vector<string>& paths) {
     rpcIds.push_back(id);
     string result;
     while (true) {
-      usleep(0);
+      usleep(1);
       {
-        lock_guard<std::recursive_mutex> lock(rpcMutex);
+        lock_guard<std::recursive_mutex> lock(mutex);
         if (rpc->hasIncomingReplyWithId(id)) {
           result = rpc->consumeIncomingReplyWithId(id);
           break;
@@ -115,7 +115,7 @@ vector<optional<FileData>> Client::getNodes(const vector<string>& paths) {
       }
     }
     {
-      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      lock_guard<std::recursive_mutex> lock(mutex);
       MessageReader reader;
       reader.load(result);
       while (reader.sizeRemaining()) {
@@ -144,7 +144,7 @@ vector<optional<FileData>> Client::getNodes(const vector<string>& paths) {
                           "from server";
             string payload;
             {
-              lock_guard<std::recursive_mutex> lock(rpcMutex);
+              lock_guard<std::recursive_mutex> lock(mutex);
               MessageWriter writer;
               writer.start();
               writer.writePrimitive<unsigned char>(
@@ -155,7 +155,7 @@ vector<optional<FileData>> Client::getNodes(const vector<string>& paths) {
             }
             string result = fileRpc(payload);
             {
-              lock_guard<std::recursive_mutex> lock(rpcMutex);
+              lock_guard<std::recursive_mutex> lock(mutex);
               MessageReader reader;
               reader.load(result);
               auto path = reader.readPrimitive<string>();
@@ -209,9 +209,9 @@ int Client::open(const string& path, int flags) {
   int readWriteMode = (flags & O_ACCMODE);
   bool readOnly = (readWriteMode == O_RDONLY);
   LOG(INFO) << "Reading file " << path << " (readonly? " << readOnly << ")";
-  int fd = fdCounter++;
+  int fd = fileSystem->getNewFd();
 
-  if (ownedFileContents.find(path) == ownedFileContents.end()) {
+  if (!fileSystem->ownsPathContents(path)) {
     if (!readOnly) {
       fileSystem->invalidatePathAndParent(path);
     }
@@ -219,13 +219,12 @@ int Client::open(const string& path, int flags) {
     auto cachedData = fileSystem->getCachedFile(path);
     if (readOnly && cachedData) {
       LOG(INFO) << "FETCHING FROM FILE CACHE: " << cachedData->size();
-      ownedFileContents.insert(
-          make_pair(path, OwnedFileInfo(fd, *cachedData, readOnly)));
+      fileSystem->addOwnedFileContents(path, fd, *cachedData, readOnly);
     } else {
       string payload;
       {
-        lock_guard<std::recursive_mutex> lock(rpcMutex);
-        cachedStatVfsProto.reset();
+        lock_guard<std::recursive_mutex> lock(mutex);
+        fileSystem->invalidateVfsCache();
         writer.start();
         writer.writePrimitive<unsigned char>(CLIENT_SERVER_REQUEST_FILE);
         writer.writePrimitive<string>(path);
@@ -234,7 +233,7 @@ int Client::open(const string& path, int flags) {
       }
       string result = fileRpc(payload);
       {
-        lock_guard<std::recursive_mutex> lock(rpcMutex);
+        lock_guard<std::recursive_mutex> lock(mutex);
         reader.load(result);
         int rpcErrno = reader.readPrimitive<int>();
         if (rpcErrno) {
@@ -244,16 +243,12 @@ int Client::open(const string& path, int flags) {
         string fileContents = decompressString(reader.readPrimitive<string>());
         LOG(INFO) << "READ FILE: " << path << " WITH CONTENTS SIZE "
                   << fileContents.size();
-        ownedFileContents.insert(
-            make_pair(path, OwnedFileInfo(fd, fileContents, readOnly)));
+        fileSystem->addOwnedFileContents(path, fd, fileContents, readOnly);
       }
     }
   } else {
     LOG(INFO) << "FILE IS ALREADY IN LOCAL CACHE, SKIPPING READ";
-    ownedFileContents.at(path).fds.insert(fd);
-    if (!readOnly) {
-      ownedFileContents.at(path).readOnly = false;
-    }
+    fileSystem->addHandleToOwnedFile(path, fd, readOnly);
   }
   return fd;
 }
@@ -264,9 +259,9 @@ int Client::create(const string& path, int flags, mode_t mode) {
   int readWriteMode = (flags & O_ACCMODE);
   bool readOnly = (readWriteMode == O_RDONLY);
   LOG(INFO) << "Creating file " << path << " (readonly? " << readOnly << ")";
-  int fd = fdCounter++;
+  int fd = fileSystem->getNewFd();
 
-  if (ownedFileContents.find(path) == ownedFileContents.end()) {
+  if (!fileSystem->ownsPathContents(path)) {
     if (!readOnly) {
       fileSystem->invalidatePathAndParent(path);
     }
@@ -277,8 +272,8 @@ int Client::create(const string& path, int flags, mode_t mode) {
     } else {
       string payload;
       {
-        lock_guard<std::recursive_mutex> lock(rpcMutex);
-        cachedStatVfsProto.reset();
+        lock_guard<std::recursive_mutex> lock(mutex);
+        fileSystem->invalidateVfsCache();
         writer.start();
         writer.writePrimitive<unsigned char>(CLIENT_SERVER_CREATE_FILE);
         writer.writePrimitive<string>(path);
@@ -290,7 +285,7 @@ int Client::create(const string& path, int flags, mode_t mode) {
       fileSystem->createStub(path);
       string result = fileRpc(payload);
       {
-        lock_guard<std::recursive_mutex> lock(rpcMutex);
+        lock_guard<std::recursive_mutex> lock(mutex);
         reader.load(result);
         int rpcErrno = reader.readPrimitive<int>();
         if (rpcErrno) {
@@ -299,8 +294,7 @@ int Client::create(const string& path, int flags, mode_t mode) {
           return -1;
         }
         LOG(INFO) << "CREATED FILE: " << path;
-        ownedFileContents.insert(
-            make_pair(path, OwnedFileInfo(fd, "", readOnly)));
+        fileSystem->addOwnedFileContents(path, fd, "", readOnly);
       }
     }
   } else {
@@ -313,41 +307,33 @@ int Client::create(const string& path, int flags, mode_t mode) {
 int Client::close(const string& path, int fd) {
   MessageReader reader;
   MessageWriter writer;
-  auto& ownedFile = ownedFileContents.at(path);
-  if (ownedFile.fds.find(fd) == ownedFile.fds.end()) {
-    LOGFATAL << "Tried to close a file handle that is not owned";
-  }
-  if (!ownedFile.readOnly) {
-    LOG(INFO) << "Invalidating path";
-    fileSystem->invalidatePathAndParent(path);
-  }
+
+  bool readOnly;
+  string content;
+  fileSystem->closeOwnedFile(path, fd, &readOnly, &content);
+
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
-    cachedStatVfsProto.reset();
+    lock_guard<std::recursive_mutex> lock(mutex);
+    fileSystem->invalidateVfsCache();
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_RETURN_FILE);
     writer.writePrimitive<string>(path);
-    writer.writePrimitive<bool>(ownedFile.readOnly);
-    fileSystem->setCachedFile(path, ownedFile.content);
-    if (ownedFile.readOnly) {
+    writer.writePrimitive<bool>(readOnly);
+    fileSystem->setCachedFile(path, content);
+    if (readOnly) {
       LOG(INFO) << "RETURNED FILE " << path << " TO SERVER READ-ONLY";
     } else {
-      writer.writePrimitive<string>(compressString(ownedFile.content));
+      writer.writePrimitive<string>(compressString(content));
       LOG(INFO) << "RETURNED FILE " << path << " TO SERVER WITH "
-                << ownedFile.content.size() << " BYTES";
+                << content.size() << " BYTES";
     }
     payload = writer.finish();
   }
 
-  ownedFile.fds.erase(ownedFile.fds.find(fd));
-  if (ownedFile.fds.empty()) {
-    ownedFileContents.erase(path);
-  }
-
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -358,48 +344,23 @@ int Client::close(const string& path, int fd) {
     return 0;
   }
 }
+
 int Client::pread(const string& path, char* buf, int64_t size, int64_t offset) {
-  auto it = ownedFileContents.find(path);
-  if (it == ownedFileContents.end()) {
-    LOGFATAL << "TRIED TO READ AN INVALID PATH";
-  }
-  const auto& content = it->second.content;
-  if (offset >= int64_t(content.size())) {
-    return 0;
-  }
-  auto start = content.c_str() + offset;
-  int64_t actualSize = min(int64_t(content.size()), offset + size) - offset;
-  LOG(INFO) << content.size() << " " << size << " " << offset << " "
-            << actualSize << endl;
-  memcpy(buf, start, actualSize);
-  return actualSize;
+  return fileSystem->readOwnedFile(path, buf, size, offset);
 }
+
 int Client::pwrite(const string& path, const char* buf, int64_t size,
                    int64_t offset) {
-  auto it = ownedFileContents.find(path);
-  if (it == ownedFileContents.end()) {
-    LOGFATAL << "TRIED TO READ AN INVALID PATH: " << path;
-  }
-  if (it->second.readOnly) {
-    LOGFATAL << "Tried to write to a read-only file: " << path;
-  }
-  auto& content = it->second.content;
-  LOG(INFO) << "WRITING " << size << " TO " << path << " AT " << offset;
-  if (int64_t(content.size()) < offset + size) {
-    content.resize(offset + size, '\0');
-  }
-  memcpy(&(content[offset]), buf, size);
-  return size;
+  return fileSystem->writeOwnedFile(path, buf, size, offset);
 }
 
 int Client::mkdir(const string& path, mode_t mode) {
   MessageReader reader;
   MessageWriter writer;
-  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(path);
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_MKDIR);
     writer.writePrimitive<string>(path);
@@ -408,7 +369,7 @@ int Client::mkdir(const string& path, mode_t mode) {
   }
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -420,41 +381,31 @@ int Client::mkdir(const string& path, mode_t mode) {
 }
 
 int Client::unlink(const string& path) {
-  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(path);
   return singlePathNoReturn(CLIENT_SERVER_UNLINK, path);
 }
 
 int Client::rmdir(const string& path) {
-  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(path);
   return singlePathNoReturn(CLIENT_SERVER_RMDIR, path);
 }
 
 int Client::symlink(const string& from, const string& to) {
-  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(from);
   fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_SYMLINK, from, to);
 }
 
 int Client::rename(const string& from, const string& to) {
-  cachedStatVfsProto.reset();
+  fileSystem->invalidateVfsCache();
   LOG(INFO) << "RENAMING FROM " << from << " TO " << to;
-  if (ownedFileContents.find(to) != ownedFileContents.end()) {
-    LOGFATAL << "I don't handle renaming from one open file to another yet";
-  }
-  if (ownedFileContents.find(from) != ownedFileContents.end()) {
-    ownedFileContents.insert(make_pair(to, ownedFileContents.at(from)));
-    ownedFileContents.erase(ownedFileContents.find(from));
-  }
+  fileSystem->renameOwnedFileIfItExists(from, to);
   fileSystem->invalidatePathAndParentAndChildren(from);
   fileSystem->invalidatePathAndParentAndChildren(to);
   return twoPathsNoReturn(CLIENT_SERVER_RENAME, from, to);
 }
 
 int Client::link(const string& from, const string& to) {
-  cachedStatVfsProto.reset();
   fileSystem->invalidatePathAndParent(from);
   fileSystem->invalidatePathAndParent(to);
   return twoPathsNoReturn(CLIENT_SERVER_LINK, from, to);
@@ -466,7 +417,7 @@ int Client::chmod(const string& path, int mode) {
   fileSystem->invalidatePath(path);
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_CHMOD);
     writer.writePrimitive<string>(path);
@@ -475,7 +426,7 @@ int Client::chmod(const string& path, int mode) {
   }
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -491,7 +442,7 @@ int Client::lchown(const string& path, int64_t uid, int64_t gid) {
   fileSystem->invalidatePath(path);
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_LCHOWN);
     writer.writePrimitive<string>(path);
@@ -501,7 +452,7 @@ int Client::lchown(const string& path, int64_t uid, int64_t gid) {
   }
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -514,16 +465,15 @@ int Client::lchown(const string& path, int64_t uid, int64_t gid) {
 int Client::truncate(const string& path, int64_t size) {
   MessageReader reader;
   MessageWriter writer;
-  cachedStatVfsProto.reset();
-  if (ownedFileContents.find(path) != ownedFileContents.end()) {
-    ownedFileContents.at(path).content.resize(size, '\0');
+  fileSystem->invalidateVfsCache();
+  if (fileSystem->truncateOwnedFileIfExists(path, size)) {
     return 0;
   }
 
   fileSystem->invalidatePath(path);
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_TRUNCATE);
     writer.writePrimitive<string>(path);
@@ -532,7 +482,7 @@ int Client::truncate(const string& path, int64_t size) {
   }
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -547,19 +497,21 @@ int Client::statvfs(struct statvfs* stbuf) {
   MessageReader reader;
   MessageWriter writer;
 
-  if (cachedStatVfsProto) {
-    statVfsProto = *cachedStatVfsProto;
+  auto cachedVfs = fileSystem->getVfsCache();
+
+  if (cachedVfs) {
+    statVfsProto = *cachedVfs;
   } else {
     string payload;
     {
-      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      lock_guard<std::recursive_mutex> lock(mutex);
       writer.start();
       writer.writePrimitive<unsigned char>(CLIENT_SERVER_STATVFS);
       payload = writer.finish();
     }
     string result = fileRpc(payload);
     {
-      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      lock_guard<std::recursive_mutex> lock(mutex);
       reader.load(result);
       int res = reader.readPrimitive<int>();
       int rpcErrno = reader.readPrimitive<int>();
@@ -568,7 +520,7 @@ int Client::statvfs(struct statvfs* stbuf) {
         errno = rpcErrno;
         return res;
       }
-      cachedStatVfsProto = statVfsProto;
+      fileSystem->setVfsCache(statVfsProto);
     }
   }
   stbuf->f_bsize = statVfsProto.bsize();
@@ -591,7 +543,7 @@ int Client::utimensat(const string& path, const struct timespec ts[2]) {
   fileSystem->invalidatePath(path);
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_UTIMENSAT);
     writer.writePrimitive<string>(path);
@@ -603,7 +555,7 @@ int Client::utimensat(const string& path, const struct timespec ts[2]) {
   }
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -619,7 +571,7 @@ int Client::lremovexattr(const string& path, const string& name) {
   fileSystem->invalidatePath(path);
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_LREMOVEXATTR);
     writer.writePrimitive<string>(path);
@@ -628,7 +580,7 @@ int Client::lremovexattr(const string& path, const string& name) {
   }
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -645,7 +597,7 @@ int Client::lsetxattr(const string& path, const string& name,
   fileSystem->invalidatePath(path);
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     writer.start();
     writer.writePrimitive<unsigned char>(CLIENT_SERVER_LSETXATTR);
     writer.writePrimitive<string>(path);
@@ -657,7 +609,7 @@ int Client::lsetxattr(const string& path, const string& name,
   }
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -674,7 +626,7 @@ int Client::twoPathsNoReturn(unsigned char header, const string& from,
   MessageWriter writer;
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     writer.start();
     writer.writePrimitive<unsigned char>(header);
     writer.writePrimitive<string>(from);
@@ -683,7 +635,7 @@ int Client::twoPathsNoReturn(unsigned char header, const string& from,
   }
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -699,7 +651,7 @@ int Client::singlePathNoReturn(unsigned char header, const string& path) {
   MessageWriter writer;
   string payload;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     writer.start();
     writer.writePrimitive<unsigned char>(header);
     writer.writePrimitive<string>(path);
@@ -707,7 +659,7 @@ int Client::singlePathNoReturn(unsigned char header, const string& path) {
   }
   string result = fileRpc(payload);
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     reader.load(result);
     int res = reader.readPrimitive<int>();
     int rpcErrno = reader.readPrimitive<int>();
@@ -721,13 +673,13 @@ int Client::singlePathNoReturn(unsigned char header, const string& path) {
 string Client::fileRpc(const string& payload) {
   RpcId id;
   {
-    lock_guard<std::recursive_mutex> lock(rpcMutex);
+    lock_guard<std::recursive_mutex> lock(mutex);
     id = rpc->request(payload);
   }
   while (true) {
-    usleep(0);
+    usleep(1);
     {
-      lock_guard<std::recursive_mutex> lock(rpcMutex);
+      lock_guard<std::recursive_mutex> lock(mutex);
       if (rpc->hasIncomingReplyWithId(id)) {
         return rpc->consumeIncomingReplyWithId(id);
       }

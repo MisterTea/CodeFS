@@ -14,18 +14,18 @@ void ServerFileSystem::init() {
 }
 
 void ServerFileSystem::rescanPath(const string& absolutePath) {
-  std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+  std::lock_guard<std::recursive_mutex> lock(mutex);
   scanNode(absolutePath);
 }
 
 string ServerFileSystem::readFile(const string& path) {
-  std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+  std::lock_guard<std::recursive_mutex> lock(mutex);
   return fileToStr(relativeToAbsolute(path));
 }
 
 int ServerFileSystem::writeFile(const string& path,
                                 const string& fileContents) {
-  std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+  std::lock_guard<std::recursive_mutex> lock(mutex);
   FILE* fp = ::fopen(relativeToAbsolute(path).c_str(), "wb");
   if (fp == NULL) {
     return -1;
@@ -62,7 +62,7 @@ void ServerFileSystem::scanRecursively(
     return;
   }
 
-  std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+  std::lock_guard<std::recursive_mutex> lock(mutex);
   VLOG(1) << "SCANNING DIRECTORY " << path_string;
   scanNode(path_string);
 
@@ -109,7 +109,7 @@ void ServerFileSystem::scanNode(const string& path) {
 
   FileData fd;
   {
-    std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     VLOG(1) << "SCANNING NODE : " << path;
 
     fd.set_path(absoluteToRelative(path));
@@ -128,7 +128,7 @@ void ServerFileSystem::scanNode(const string& path) {
       } else {
         VLOG(1) << "FILE IS GONE: " << path << " " << errno;
         {
-          std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+          std::lock_guard<std::recursive_mutex> lock(mutex);
           allFileData.erase(absoluteToRelative(path));
         }
         fd.set_deleted(true);
@@ -169,7 +169,7 @@ void ServerFileSystem::scanNode(const string& path) {
       VLOG(1) << "FILE IS GONE: " << path << " " << errno;
       // The file is gone
       {
-        std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+        std::lock_guard<std::recursive_mutex> lock(mutex);
         allFileData.erase(absoluteToRelative(path));
       }
       fd.set_deleted(true);
@@ -275,7 +275,7 @@ void ServerFileSystem::scanNode(const string& path) {
 
     VLOG(1) << "SETTING: " << absoluteToRelative(path);
     {
-      std::lock_guard<std::recursive_mutex> lock(fileDataMutex);
+      std::lock_guard<std::recursive_mutex> lock(mutex);
       allFileData[absoluteToRelative(path)] = fd;
     }
   }
