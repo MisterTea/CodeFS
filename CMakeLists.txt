@@ -1,17 +1,12 @@
-cmake_minimum_required (VERSION 2.8.12)
-project (CodeFS)
+cmake_minimum_required (VERSION 3.0.2)
+project (CodeFS VERSION 0.0.1)
 
 option(BUILD_TEST "Build all unit test" ON)
 option(CODE_COVERAGE "Enable code coverage" OFF)
 option(BUILD_CLIENT "Build the client (depends on fuse)" ON)
 
 
-set (${PROJECT_NAME}_VERSION_MAJOR 0)
-set (${PROJECT_NAME}_VERSION_MINOR 0)
-set (${PROJECT_NAME}_VERSION_PATCH 1)
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCODEFS_VERSION='\"${EternalTCP_VERSION_MAJOR}.${EternalTCP_VERSION_MINOR}.${EternalTCP_VERSION_PATCH}\"'")
-# For easylogging, disable default log file, enable crash log, ensure thread safe, and catch c++ exceptions
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DELPP_NO_DEFAULT_LOG_FILE -DELPP_FEATURE_CRASH_LOG -DELPP_THREAD_SAFE -DELPP_HANDLE_SIGABRT")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCODEFS_VERSION='\"${PROJECT_VERSION}\"'")
 
 # Needed for FUSE
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64")
@@ -19,8 +14,13 @@ SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64")
 # Debug info for getting line numbers
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 
+IF(APPLE)
+# Turn off address randomizing to get debug prints
+SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-pie")
+ENDIF()
+
 IF(BUILD_TEST)
-  add_subdirectory(${CMAKE_SOURCE_DIR}/external/googletest-1.8.0)
+  add_subdirectory(${CMAKE_SOURCE_DIR}/external/googletest)
 ENDIF(BUILD_TEST)
 IF(CODE_COVERAGE)
   if(UNIX)
@@ -83,10 +83,10 @@ add_custom_target(
 
 include_directories(
   src/base
-  external/msgpack-3.0.1/include
-  external/Optional
-  external/simpleini
-  external/CTPL
+  external
+  external/asio/asio/include
+  external/json/include
+  external/msgpack-c/include
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${GFLAGS_INCLUDE_DIRS}
@@ -103,8 +103,7 @@ add_library(
 
   external/simpleini/ConvertUTF.c
 
-  src/base/easylogging++.h
-  src/base/easylogging++.cc
+  src/base/EasyLoggingWrapper.cpp
 
   src/base/LogHandler.hpp
   src/base/LogHandler.cpp
@@ -112,8 +111,8 @@ add_library(
   src/base/DaemonCreator.hpp
   src/base/DaemonCreator.cpp
 
-  src/base/RawSocketUtils.hpp
-  src/base/RawSocketUtils.cpp
+  src/base/PidController.hpp
+  src/base/PidController.cpp
 
   src/base/FileSystem.hpp
   src/base/FileSystem.cpp

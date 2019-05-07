@@ -34,7 +34,7 @@ void FileSystem::deserializeFileDataCompressed(const string& path,
     auto fileData = reader.readProto<FileData>();
     VLOG(1) << "GOT FILE: " << fileData.path();
     if (fileData.invalid()) {
-      LOG(FATAL) << "Got an invalid file from the server!";
+      LOGFATAL << "Got an invalid file from the server!";
     }
     allFileData.erase(fileData.path());
     allFileData.insert(make_pair(fileData.path(), fileData));

@@ -100,7 +100,7 @@ static int codefs_readdir(const char *path, void *buf, fuse_fill_dir_t filler,
     memset(&st, 0, sizeof(struct stat));
     FileSystem::protoToStat(child.stat_data(), &st);
     if (filler(buf, fileName.c_str(), &st, 0)) {
-      LOG(FATAL) << "Filler returned non-zero value";
+      LOGFATAL << "Filler returned non-zero value";
       break;
     }
   }
@@ -237,17 +237,17 @@ static int codefs_lock(const char *path, struct fuse_file_info *fi, int cmd,
       }
       break;
     case F_SETLKW:
-      LOG(FATAL) << "This can't happen because FUSE is single threaded.";
+      LOGFATAL << "This can't happen because FUSE is single threaded.";
       break;
     default:
-      LOG(FATAL) << "Invalid lock command";
+      LOGFATAL << "Invalid lock command";
   }
   return 0;
 }
 
 static int codefs_getattr(const char *path, struct stat *stbuf) {
   if (stbuf == NULL) {
-    LOG(FATAL) << "Tried to getattr with a NULL stat object";
+    LOGFATAL << "Tried to getattr with a NULL stat object";
   }
 
   LOG(INFO) << "GETTING ATTR FOR PATH: " << path;
@@ -343,7 +343,7 @@ static int codefs_create(const char *path, mode_t mode,
 
 static int codefs_open(const char *path, struct fuse_file_info *fi) {
   if (fi->flags & O_CREAT) {
-    LOG(FATAL) << "GOT O_CREAT BUT NO MODE";
+    LOGFATAL << "GOT O_CREAT BUT NO MODE";
   }
   int openModes = 0;
   int readWriteMode = (fi->flags & O_ACCMODE);
@@ -356,7 +356,7 @@ static int codefs_open(const char *path, struct fuse_file_info *fi) {
     openModes++;
     if (fi->flags & O_APPEND) {
       // We need to get the file from the server to append
-      LOG(FATAL) << "APPEND NOT SUPPORTED YET";
+      LOGFATAL << "APPEND NOT SUPPORTED YET";
     }
   }
   if (readWriteMode == O_RDWR) {
@@ -364,7 +364,7 @@ static int codefs_open(const char *path, struct fuse_file_info *fi) {
     openModes++;
   }
   if (openModes != 1) {
-    LOG(FATAL) << "Invalid open openModes: " << fi->flags;
+    LOGFATAL << "Invalid open openModes: " << fi->flags;
   }
   int fd = client->open(path, fi->flags);
   if (fd == -1) return -errno;
@@ -410,7 +410,7 @@ static int codefs_release(const char *path, struct fuse_file_info *fi) {
   LOG(INFO) << "RELEASING " << path << " FD " << fd;
   auto it = fdMap.find((int64_t)(fd));
   if (it == fdMap.end()) {
-    LOG(FATAL) << "Tried to close an fd that doesn't exist";
+    LOGFATAL << "Tried to close an fd that doesn't exist";
   }
   string pathFromFd = it->second.path;
   if (pathFromFd != string(path)) {
@@ -447,7 +447,7 @@ static int codefs_setxattr(const char *path, const char *name,
 static int codefs_getxattr_osx(const char *path, const char *name, char *value,
                                size_t size, uint32_t position) {
   if (position) {
-    LOG(FATAL) << "Got a non-zero position: " << position;
+    LOGFATAL << "Got a non-zero position: " << position;
   }
   return codefs_getxattr(path, name, value, size);
 }
@@ -456,7 +456,7 @@ static int codefs_setxattr_osx(const char *path, const char *name,
                                const char *value, size_t size, int flags,
                                uint32_t position) {
   if (position) {
-    LOG(FATAL) << "Got a non-zero position: " << position;
+    LOGFATAL << "Got a non-zero position: " << position;
   }
   return codefs_setxattr(path, name, value, size, flags);
 }
@@ -466,7 +466,7 @@ void ClientFuseAdapter::assignCallbacks(
     shared_ptr<ClientFileSystem> _fileSystem, shared_ptr<Client> _client,
     fuse_operations *ops) {
   if (fileSystem.get()) {
-    LOG(FATAL) << "Already initialized FUSE ops!";
+    LOGFATAL << "Already initialized FUSE ops!";
   }
   fileSystem = _fileSystem;
   client = _client;

@@ -43,7 +43,7 @@ void runFuse(char *binaryLocation, shared_ptr<Client> client,
   struct fuse_args args = FUSE_ARGS_INIT(argc, argv);
 
   if (fuse_opt_parse(&args, &loopback, codefs_opts, NULL) == -1) {
-    LOG(FATAL) << "Error parsing fuse options";
+    LOGFATAL << "Error parsing fuse options";
   }
 
   umask(0);
@@ -56,7 +56,7 @@ void runFuse(char *binaryLocation, shared_ptr<Client> client,
   int res = fuse_main(argc, argv, &codefs_oper, NULL);
   fuse_opt_free_args(&args);
   if (res) {
-    LOG(FATAL) << "Unclean exit from fuse thread: " << res
+    LOGFATAL << "Unclean exit from fuse thread: " << res
                << " (errno: " << errno << ")";
   } else {
     LOG(INFO) << "FUSE THREAD EXIT";
@@ -88,7 +88,7 @@ int main(int argc, char *argv[]) {
   } else {
     if (!boost::filesystem::is_directory(pt)) {
       cout << "Error: The mountpoint is not a directory" << endl;
-      LOG(FATAL) << "The mountpoint is not a directory";
+      LOGFATAL << "The mountpoint is not a directory";
     }
   }
 

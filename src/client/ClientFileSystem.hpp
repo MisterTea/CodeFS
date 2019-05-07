@@ -71,7 +71,7 @@ class ClientFileSystem : public FileSystem {
       }
     }
     if (path == string("/")) {
-      LOG(FATAL) << "Somehow we don't have the root path???";
+      LOGFATAL << "Somehow we don't have the root path???";
     }
     auto parentPath = boost::filesystem::path(path).parent_path().string();
     vector<string> retval = getPathsToDownload(parentPath);

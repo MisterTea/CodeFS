@@ -49,9 +49,9 @@ void runFsWatch() {
           case PlatformSpecific:
             break;
           case Overflow:
-            LOG(FATAL) << "Overflow";
+            LOGFATAL << "Overflow";
           default:
-            LOG(FATAL) << "Unhandled flag " << it2;
+            LOGFATAL << "Unhandled flag " << it2;
         }
       }
     }
@@ -94,7 +94,7 @@ int main(int argc, char *argv[]) {
   el::Loggers::reconfigureLogger("default", defaultConf);
 
   if (!FLAGS_path.length()) {
-    LOG(FATAL) << "Please specify a --path flag containing the code path";
+    LOGFATAL << "Please specify a --path flag containing the code path";
   }
 
   FLAGS_path = boost::filesystem::canonical(boost::filesystem::path(FLAGS_path))
@@ -115,7 +115,7 @@ int main(int argc, char *argv[]) {
         excludes.insert(boost::filesystem::path(FLAGS_path) / exclude);
       }
     } else {
-      LOG(FATAL) << "Invalid ini file: " << cfgPath;
+      LOGFATAL << "Invalid ini file: " << cfgPath;
     }
   }
 

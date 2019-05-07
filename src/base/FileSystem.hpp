@@ -52,7 +52,7 @@ class FileSystem {
 
   virtual string absoluteToRelative(const string &absolutePath) {
     if (absolutePath.find(rootPath) != 0) {
-      LOG(FATAL) << "Tried to convert absolute path to fuse that wasn't inside "
+      LOGFATAL << "Tried to convert absolute path to fuse that wasn't inside "
                     "the absolute FS: "
                  << absolutePath << " " << rootPath;
     }

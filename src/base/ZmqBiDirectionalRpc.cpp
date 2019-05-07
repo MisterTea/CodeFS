@@ -2,7 +2,7 @@
 
 namespace codefs {
 ZmqBiDirectionalRpc::ZmqBiDirectionalRpc(const string& _address, bool _bind)
-    : BiDirectionalRpc(true), address(_address), bind(_bind) {
+    : BiDirectionalRpc(), address(_address), bind(_bind) {
   context = shared_ptr<zmq::context_t>(new zmq::context_t(8));
   if (bind) {
     LOG(INFO) << "Binding on address: " << address;
@@ -20,7 +20,7 @@ ZmqBiDirectionalRpc::ZmqBiDirectionalRpc(const string& _address, bool _bind)
 
 ZmqBiDirectionalRpc::~ZmqBiDirectionalRpc() {
   if (context.get() || socket.get()) {
-    LOG(FATAL) << "Tried to destroy an RPC instance without calling shutdown";
+    LOGFATAL << "Tried to destroy an RPC instance without calling shutdown";
   }
 }
 
@@ -54,13 +54,13 @@ void ZmqBiDirectionalRpc::update() {
       }
     }
     if (!message.more()) {
-      LOG(FATAL) << "Expected more data!";
+      LOGFATAL << "Expected more data!";
     }
 
     // The data
     FATAL_IF_FALSE(socket->recv(&message));
     if (message.more()) {
-      LOG(FATAL) << "DID NOT GET ALL";
+      LOGFATAL << "DID NOT GET ALL";
     }
 
     VLOG(1) << "Got message with size " << message.size() << endl;
@@ -89,7 +89,7 @@ void ZmqBiDirectionalRpc::reconnect() {
 void ZmqBiDirectionalRpc::send(const string& message) {
   VLOG(1) << "SENDING " << message.length();
   if (message.length() == 0) {
-    LOG(FATAL) << "Invalid message size";
+    LOGFATAL << "Invalid message size";
   }
   if (bind) {
     if (clientIdentity.size() == 0) {

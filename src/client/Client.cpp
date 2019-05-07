@@ -1,7 +1,6 @@
 #include "Client.hpp"
 
 #include "FileUtils.hpp"
-#include "RawSocketUtils.hpp"
 
 namespace codefs {
 Client::Client(const string& _address, shared_ptr<ClientFileSystem> _fileSystem)
@@ -54,10 +53,10 @@ int Client::update() {
         cachedStatVfsProto.reset();
         FileData fileData = reader.readProto<FileData>();
         if (fileData.invalid()) {
-          LOG(FATAL) << "Got filedata with invalid set";
+          LOGFATAL << "Got filedata with invalid set";
         }
         if (path != fileData.path()) {
-          LOG(FATAL) << "PATH MISMATCH: " << path << " != " << fileData.path();
+          LOGFATAL << "PATH MISMATCH: " << path << " != " << fileData.path();
         }
         vector<string> pathsToDownload = fileSystem->getPathsToDownload(path);
         if (pathsToDownload.empty()) {
@@ -69,7 +68,7 @@ int Client::update() {
         rpc->reply(id, writer.finish());
       } break;
       default:
-        LOG(FATAL) << "Invalid packet header: " << int(header);
+        LOGFATAL << "Invalid packet header: " << int(header);
     }
   }
 
@@ -82,9 +81,9 @@ vector<optional<FileData>> Client::getNodes(const vector<string>& paths) {
   vector<string> metadataToFetch;
   for (auto path : paths) {
     vector<string> pathsToDownload = fileSystem->getPathsToDownload(path);
-    LOG(INFO) << "Number of paths: " << pathsToDownload.size();
+    VLOG(1) << "Number of paths: " << pathsToDownload.size();
     for (auto it : pathsToDownload) {
-      LOG(INFO) << "GETTING SCAN FOR PATH: " << it;
+      VLOG(1) << "GETTING SCAN FOR PATH: " << it;
       metadataToFetch.push_back(it);
     }
   }
@@ -182,7 +181,7 @@ optional<FileData> Client::getNodeAndChildren(const string& path,
   vector<string> childrenPaths;
   if (parentNode) {
     // Check the children
-    LOG(INFO) << "NUM CHILDREN: " << parentNode->child_node_size();
+    VLOG(1) << "NUM CHILDREN: " << parentNode->child_node_size();
     children->clear();
     for (int a = 0; a < parentNode->child_node_size(); a++) {
       string fileName = parentNode->child_node(a);
@@ -274,7 +273,7 @@ int Client::create(const string& path, int flags, mode_t mode) {
 
     auto cachedData = fileSystem->getCachedFile(path);
     if (cachedData) {
-      LOG(FATAL) << "TRIED TO CREATE A FILE THAT IS CACHED";
+      LOGFATAL << "TRIED TO CREATE A FILE THAT IS CACHED";
     } else {
       string payload;
       {
@@ -305,7 +304,7 @@ int Client::create(const string& path, int flags, mode_t mode) {
       }
     }
   } else {
-    LOG(FATAL) << "Tried to create a file that is already owned!";
+    LOGFATAL << "Tried to create a file that is already owned!";
   }
 
   return fd;
@@ -316,7 +315,7 @@ int Client::close(const string& path, int fd) {
   MessageWriter writer;
   auto& ownedFile = ownedFileContents.at(path);
   if (ownedFile.fds.find(fd) == ownedFile.fds.end()) {
-    LOG(FATAL) << "Tried to close a file handle that is not owned";
+    LOGFATAL << "Tried to close a file handle that is not owned";
   }
   if (!ownedFile.readOnly) {
     LOG(INFO) << "Invalidating path";
@@ -362,7 +361,7 @@ int Client::close(const string& path, int fd) {
 int Client::pread(const string& path, char* buf, int64_t size, int64_t offset) {
   auto it = ownedFileContents.find(path);
   if (it == ownedFileContents.end()) {
-    LOG(FATAL) << "TRIED TO READ AN INVALID PATH";
+    LOGFATAL << "TRIED TO READ AN INVALID PATH";
   }
   const auto& content = it->second.content;
   if (offset >= int64_t(content.size())) {
@@ -379,10 +378,10 @@ int Client::pwrite(const string& path, const char* buf, int64_t size,
                    int64_t offset) {
   auto it = ownedFileContents.find(path);
   if (it == ownedFileContents.end()) {
-    LOG(FATAL) << "TRIED TO READ AN INVALID PATH: " << path;
+    LOGFATAL << "TRIED TO READ AN INVALID PATH: " << path;
   }
   if (it->second.readOnly) {
-    LOG(FATAL) << "Tried to write to a read-only file: " << path;
+    LOGFATAL << "Tried to write to a read-only file: " << path;
   }
   auto& content = it->second.content;
   LOG(INFO) << "WRITING " << size << " TO " << path << " AT " << offset;
@@ -443,7 +442,7 @@ int Client::rename(const string& from, const string& to) {
   cachedStatVfsProto.reset();
   LOG(INFO) << "RENAMING FROM " << from << " TO " << to;
   if (ownedFileContents.find(to) != ownedFileContents.end()) {
-    LOG(FATAL) << "I don't handle renaming from one open file to another yet";
+    LOGFATAL << "I don't handle renaming from one open file to another yet";
   }
   if (ownedFileContents.find(from) != ownedFileContents.end()) {
     ownedFileContents.insert(make_pair(to, ownedFileContents.at(from)));

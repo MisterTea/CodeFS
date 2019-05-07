@@ -1,6 +1,5 @@
 #include "Server.hpp"
 
-#include "RawSocketUtils.hpp"
 #include "ZmqBiDirectionalRpc.hpp"
 
 namespace codefs {
@@ -377,7 +376,7 @@ int Server::update() {
         fileSystem->rescanPath(fileSystem->relativeToAbsolute(path));
       } break;
       default:
-        LOG(FATAL) << "Invalid packet header: " << int(header);
+        LOGFATAL << "Invalid packet header: " << int(header);
     }
   }
 
@@ -401,7 +400,7 @@ int Server::update() {
       } break;
 
       default:
-        LOG(FATAL) << "Invalid packet header: " << int(header);
+        LOGFATAL << "Invalid packet header: " << int(header);
     }
   }
 

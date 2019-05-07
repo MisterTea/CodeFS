@@ -1,8 +1,15 @@
-#ifndef __ETERNAL_TCP_HEADERS__
-#define __ETERNAL_TCP_HEADERS__
+#ifndef __CODEFS_HEADERS__
+#define __CODEFS_HEADERS__
 
-#if __FreeBSD__
-#define _WITH_GETLINE
+#define ELPP_FEATURE_ALL (1)
+#define ELPP_THREAD_SAFE (1)
+
+// Enable standalone asio
+#ifndef ASIO_STANDALONE
+#define ASIO_STANDALONE (1)
+#endif
+#ifndef USE_STANDALONE_ASIO
+#define USE_STANDALONE_ASIO (1)
 #endif
 
 #include <sys/xattr.h>
@@ -13,6 +20,7 @@
 #include <sys/vnode.h>
 #include <util.h>
 #elif __FreeBSD__
+#define _WITH_GETLINE
 #include <libutil.h>
 #elif __NetBSD__  // do not need pty.h on NetBSD
 #else
@@ -75,22 +83,33 @@ extern "C" {
 
 #include <gflags/gflags.h>
 
-#include "ctpl_stl.h"
+#include "CTPL/ctpl_stl.h"
 
-#include "SimpleIni.h"
+#include "simpleini/SimpleIni.h"
 
-#include "easylogging++.h"
+#include "easyloggingpp/src/easylogging++.h"
+
+#if ELPP_STACKTRACE
+#define LOGFATAL \
+  (LOG(ERROR) << "\n" << el::base::debug::StackTrace(), LOG(FATAL))
+#else
+#define LOGFATAL LOGFATAL
+#endif  // ELPP_STACKTRACE
 
 #include "zlib.h"
 
-#include "base64.hpp"
-#include "json.hpp"
+#include "cppcodec/cppcodec/base64_default_rfc4648.hpp"
+using base64 = cppcodec::base64_rfc4648;
+
+#include "CTPL/ctpl_stl.h"
+#include "Catch2/single_include/catch2/catch.hpp"
 #include "msgpack.hpp"
-#include "sole.hpp"
+#include "nlohmann/json.hpp"
+#include "sole/sole.hpp"
 #include "zmq.hpp"
 #include "zmq_addon.hpp"
 
-#include "optional.hpp"
+#include "Optional/optional.hpp"
 using namespace std::experimental;
 
 #include "CodeFS.pb.h"
@@ -116,21 +135,20 @@ static const int PROTOCOL_VERSION = 1;
 
 #define FATAL_IF_FALSE(X) \
   if (((X) == false))     \
-    LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno);
+    LOGFATAL << "Error: (" << errno << "): " << strerror(errno);
 
-#define FATAL_IF_FALSE_NOT_EAGAIN(X)                                 \
-  if (((X) == false)) {                                              \
-    if (errno == EAGAIN) {                                           \
-      VLOG(10) << "Could not complete: (" << errno                   \
-               << "): " << strerror(errno);                          \
-    } else {                                                         \
-      LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno); \
-    }                                                                \
+#define FATAL_IF_FALSE_NOT_EAGAIN(X)                               \
+  if (((X) == false)) {                                            \
+    if (errno == EAGAIN) {                                         \
+      VLOG(10) << "Could not complete: (" << errno                 \
+               << "): " << strerror(errno);                        \
+    } else {                                                       \
+      LOGFATAL << "Error: (" << errno << "): " << strerror(errno); \
+    }                                                              \
   }
 
 #define FATAL_FAIL(X) \
-  if (((X) == -1))    \
-    LOG(FATAL) << "Error: (" << errno << "): " << strerror(errno);
+  if (((X) == -1)) LOGFATAL << "Error: (" << errno << "): " << strerror(errno);
 
 #define DRAW_FROM_UNORDERED(ITERATOR, COLLECTION) \
   auto ITERATOR = COLLECTION.begin();             \
