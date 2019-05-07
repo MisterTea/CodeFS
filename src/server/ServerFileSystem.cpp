@@ -58,6 +58,7 @@ void ServerFileSystem::scanRecursively(
   auto path =
       boost::filesystem::canonical(boost::filesystem::path(path_string));
   if (excludes.find(path) != excludes.end()) {
+    LOG(INFO) << "Ignoring " << path;
     return;
   }
 
@@ -102,6 +103,7 @@ void ServerFileSystem::scanNode(const string& path) {
     LOG(ERROR) << "Error resolving file: " << ex.what();
   }
   if (excludes.find(pathObj) != excludes.end()) {
+    LOG(INFO) << "Ignoring " << pathObj;
     return;
   }
 
@@ -234,7 +236,21 @@ void ServerFileSystem::scanNode(const string& path) {
         if (boost::filesystem::is_symlink(it.path()) ||
             boost::filesystem::is_regular_file(it.path()) ||
             boost::filesystem::is_directory(it.path())) {
-          fd.add_child_node(it.path().filename().string());
+          auto childPath = it.path();
+          VLOG(1) << "GOT CHILD PATH: " << childPath;
+          try {
+            if (exists(childPath)) {
+              childPath = boost::filesystem::canonical(childPath);
+              if (excludes.find(childPath) == excludes.end()) {
+                VLOG(1) << "ADDING CHILD NAME: "
+                        << it.path().filename().string();
+                fd.add_child_node(it.path().filename().string());
+              }
+            }
+          } catch (const boost::filesystem::filesystem_error& ex) {
+            // Can happen for self-referencing symbolic links
+            LOG(ERROR) << "Error resolving file: " << ex.what();
+          }
         }
       }
     }

@@ -124,9 +124,12 @@ int main(int argc, char *argv[]) {
   while (true) {
     auto cfgPath = pathToCheck / boost::filesystem::path(".watchmanconfig");
     if (boost::filesystem::exists(cfgPath)) {
+      LOG(INFO) << "Found watchman config: " << cfgPath;
       auto configJson = json::parse(fileToStr(cfgPath.string()));
       for (auto ignoreDir : configJson["ignore_dirs"]) {
-        excludes.insert(pathToCheck / ignoreDir.get<std::string>());
+        auto absoluteIgnoreDir = pathToCheck / ignoreDir.get<std::string>();
+        LOG(INFO) << "Adding exclude: " << absoluteIgnoreDir;
+        excludes.insert(absoluteIgnoreDir);
       }
       break;
     }
