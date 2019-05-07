@@ -7,3 +7,27 @@
 [submodule "external/CTPL"]
 	path = external/CTPL
 	url = https://github.com/vit-vit/CTPL.git
+[submodule "external/asio"]
+	path = external/asio
+	url = https://github.com/chriskohlhoff/asio.git
+[submodule "external/Catch2"]
+	path = external/Catch2
+	url = https://github.com/catchorg/Catch2.git
+[submodule "external/cxxopts"]
+	path = external/cxxopts
+	url = https://github.com/jarro2783/cxxopts.git
+[submodule "external/fmt"]
+	path = external/fmt
+	url = https://github.com/fmtlib/fmt.git
+[submodule "external/easyloggingpp"]
+	path = external/easyloggingpp
+	url = https://github.com/zuhd-org/easyloggingpp.git
+[submodule "external/cppcodec"]
+	path = external/cppcodec
+	url = https://github.com/tplgy/cppcodec.git
+[submodule "external/json"]
+	path = external/json
+	url = https://github.com/nlohmann/json.git
+[submodule "external/sole"]
+	path = external/sole
+	url = https://github.com/r-lyeh-archived/sole.git
