@@ -155,16 +155,21 @@ int main(int argc, char *argv[]) {
   server->init();
   usleep(100 * 1000);
 
-  int counter = 0;
+  auto lastHeartbeatTime = std::chrono::high_resolution_clock::now();
   while (true) {
     int retval = server->update();
     if (retval) {
       return retval;
     }
-    if (++counter % 3000 == 0) {
+    auto msSinceLastHeartbeat =
+        std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::high_resolution_clock::now() - lastHeartbeatTime)
+            .count();
+    if (msSinceLastHeartbeat >= 3000) {
       server->heartbeat();
+      lastHeartbeatTime = std::chrono::high_resolution_clock::now();
     }
-    usleep(1000);
+    usleep(0);
   }
 }
 }  // namespace codefs

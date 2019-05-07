@@ -56,8 +56,8 @@ void runFuse(char *binaryLocation, shared_ptr<Client> client,
   int res = fuse_main(argc, argv, &codefs_oper, NULL);
   fuse_opt_free_args(&args);
   if (res) {
-    LOGFATAL << "Unclean exit from fuse thread: " << res
-               << " (errno: " << errno << ")";
+    LOGFATAL << "Unclean exit from fuse thread: " << res << " (errno: " << errno
+             << ")";
   } else {
     LOG(INFO) << "FUSE THREAD EXIT";
   }
@@ -100,16 +100,21 @@ int main(int argc, char *argv[]) {
   sleep(1);
 
   auto future = std::async(std::launch::async, [client] {
-    int counter = 0;
+    auto lastHeartbeatTime = std::chrono::high_resolution_clock::now();
     while (true) {
       int retval = client->update();
       if (retval) {
         return retval;
       }
-      if (++counter % 300 == 0) {
+      auto msSinceLastHeartbeat =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::high_resolution_clock::now() - lastHeartbeatTime)
+              .count();
+      if (msSinceLastHeartbeat >= 3000) {
         client->heartbeat();
+        lastHeartbeatTime = std::chrono::high_resolution_clock::now();
       }
-      usleep(10 * 1000);
+      usleep(0);
     }
   });
 

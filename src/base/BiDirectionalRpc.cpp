@@ -100,7 +100,6 @@ void BiDirectionalRpc::receive(const string& message) {
                           "didn't have: "
                        << it->first.str();
             }
-            LOG(INFO) << "Erasing receieve time for " << it->first.str();
             requestRecieveTimeMap.erase(it->first);
             outgoingReplies.erase(it);
             break;
@@ -330,7 +329,6 @@ void BiDirectionalRpc::addIncomingRequest(const IdPayload& idPayload) {
   if (requestRecieveTimeMap.find(idPayload.id) != requestRecieveTimeMap.end()) {
     LOGFATAL << "Already created receive time for id: " << idPayload.id.str();
   }
-  LOG(INFO) << "Setting receive time: " << idPayload.id.str();
   requestRecieveTimeMap[idPayload.id] = TimeHandler::currentTimeMicros();
   incomingRequests.insert(make_pair(idPayload.id, idPayload.payload));
 }
@@ -344,17 +342,17 @@ void BiDirectionalRpc::updateDrift(int64_t requestSendTime,
                        2;
   int64_t ping = (replyRecieveTime - requestSendTime) -
                  (replySendTime - requestReceiptTime);
+  networkStatsQueue.push_back({timeOffset, ping});
   VLOG(2) << "Time Sync Info: " << timeOffset << " " << ping << " "
           << (replyRecieveTime - requestSendTime) << " "
           << (replySendTime - requestReceiptTime);
-  if (rand() % 100 < 3) {  // hack to do something about 1/100 times
-    VLOG(2) << "Time Sync Info: " << timeOffset << " " << ping << " "
-            << (replyRecieveTime - requestSendTime) << " "
-            << (replySendTime - requestReceiptTime);
+  if (networkStatsQueue.size() >= 100) {
+    LOG(INFO) << "Time Sync Info: " << timeOffset << " " << ping << " "
+              << (replyRecieveTime - requestSendTime) << " "
+              << (replySendTime - requestReceiptTime);
     int64_t sumShift = 0;
     int64_t shiftCount = 0;
-    for (int i = max(0, int(networkStatsQueue.size()) - 100);
-         i < networkStatsQueue.size(); i++) {
+    for (int i = 0; i < networkStatsQueue.size(); i++) {
       sumShift += networkStatsQueue.at(i).offset;
       shiftCount++;
     }
@@ -370,10 +368,7 @@ void BiDirectionalRpc::updateDrift(int64_t requestSendTime,
   // auto shift = std::chrono::microseconds{
   //     int64_t(timeOffsetController.calculate(0, double(timeOffset)))};
   // TimeHandler::initialTime += shift;
-  networkStatsQueue.push_back({timeOffset, ping});
-  while (networkStatsQueue.size() > 1000) {
-    networkStatsQueue.pop_front();
-  }
+  networkStatsQueue.clear();
 }
 
 }  // namespace codefs

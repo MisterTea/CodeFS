@@ -105,7 +105,7 @@ vector<optional<FileData>> Client::getNodes(const vector<string>& paths) {
     rpcIds.push_back(id);
     string result;
     while (true) {
-      usleep(1000);
+      usleep(0);
       {
         lock_guard<std::recursive_mutex> lock(rpcMutex);
         if (rpc->hasIncomingReplyWithId(id)) {
@@ -725,7 +725,7 @@ string Client::fileRpc(const string& payload) {
     id = rpc->request(payload);
   }
   while (true) {
-    usleep(1000);
+    usleep(0);
     {
       lock_guard<std::recursive_mutex> lock(rpcMutex);
       if (rpc->hasIncomingReplyWithId(id)) {
