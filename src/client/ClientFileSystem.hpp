@@ -245,7 +245,7 @@ class ClientFileSystem : public FileSystem {
       LOGFATAL << "I don't handle renaming from one open file to another yet";
     }
     if (ownedFileContents.find(from) != ownedFileContents.end()) {
-      ownedFileContents.insert(make_pair(to, ownedFileContents.at(from)));
+      ownedFileContents[to] = ownedFileContents.at(from);
       ownedFileContents.erase(ownedFileContents.find(from));
     }
   }
