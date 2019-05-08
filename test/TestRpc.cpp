@@ -1,15 +1,10 @@
 #include "Headers.hpp"
 
-#include "gtest/gtest.h"
-
 #include "ZmqBiDirectionalRpc.hpp"
 
-namespace codefs {
-class RpcTest : public testing::Test {
- protected:
-  virtual void SetUp() { srand(1); }
-};
+#include "Catch2/single_include/catch2/catch.hpp"
 
+namespace codefs {
 void runServer(const string& address, int* tasksLeft, bool bind, bool flaky,
                bool barrier, bool reconnect) {
   {
@@ -59,8 +54,8 @@ void runServer(const string& address, int* tasksLeft, bool bind, bool flaky,
       while (server.hasIncomingReply()) {
         auto reply = server.getFirstIncomingReply();
         auto it = uidPayloadMap.find(reply.id);
-        EXPECT_NE(it, uidPayloadMap.end());
-        EXPECT_EQ(it->second, reply.payload);
+        REQUIRE(it != uidPayloadMap.end());
+        REQUIRE(it->second == reply.payload);
         uidPayloadMap.erase(it);
       }
       if (!done && uidPayloadMap.empty()) {
@@ -72,7 +67,7 @@ void runServer(const string& address, int* tasksLeft, bool bind, bool flaky,
     // TODO: We may still have work to do so check for other server to be done
     sleep(3);
 
-    EXPECT_TRUE(uidPayloadMap.empty());
+    REQUIRE(uidPayloadMap.empty());
 
     server.shutdown();
     LOG(INFO) << "DESTROYING SERVER";
@@ -81,7 +76,7 @@ void runServer(const string& address, int* tasksLeft, bool bind, bool flaky,
   LOG(INFO) << "SERVER EXITING";
 }
 
-TEST_F(RpcTest, ReadWrite) {
+TEST_CASE("ReadWrite", "[RpcTest]") {
   char dirSchema[] = "/tmp/TestRpc.XXXXXX";
   string dirName = mkdtemp(dirSchema);
   string address = string("ipc://") + dirName + "/ipc";
@@ -98,7 +93,7 @@ TEST_F(RpcTest, ReadWrite) {
   boost::filesystem::remove_all(dirName);
 }
 
-TEST_F(RpcTest, FlakyReadWrite) {
+TEST_CASE("FlakyReadWrite", "[RpcTest]") {
   char dirSchema[] = "/tmp/TestRpc.XXXXXX";
   string dirName = mkdtemp(dirSchema);
   string address = string("ipc://") + dirName + "/ipc";
@@ -114,7 +109,7 @@ TEST_F(RpcTest, FlakyReadWrite) {
   boost::filesystem::remove_all(dirName);
 }
 
-TEST_F(RpcTest, FlakyReadWriteDisconnect) {
+TEST_CASE("FlakyReadWriteDisconnect", "[RpcTest]") {
   char dirSchema[] = "/tmp/TestRpc.XXXXXX";
   string dirName = mkdtemp(dirSchema);
   string address = string("ipc://") + dirName + "/ipc";
@@ -129,7 +124,7 @@ TEST_F(RpcTest, FlakyReadWriteDisconnect) {
   boost::filesystem::remove_all(dirName);
 }
 
-TEST_F(RpcTest, FlakyReadWriteBarrier) {
+TEST_CASE("FlakyReadWriteBarrier", "[RpcTest]") {
   char dirSchema[] = "/tmp/TestRpc.XXXXXX";
   string dirName = mkdtemp(dirSchema);
   string address = string("ipc://") + dirName + "/ipc";

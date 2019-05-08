@@ -82,12 +82,12 @@ int main(int argc, char *argv[]) {
 
   // Setup easylogging configurations
   el::Configurations defaultConf =
-      codefs::LogHandler::SetupLogHandler(&argc, &argv);
+      codefs::LogHandler::setupLogHandler(&argc, &argv);
   defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput,
                           FLAGS_logtostdout ? "true" : "false");
   if (FLAGS_verbose) el::Loggers::setVerboseLevel(3);
   string maxlogsize = "20971520";
-  codefs::LogHandler::SetupLogFile(&defaultConf, "/tmp/codefs_server.log",
+  codefs::LogHandler::setupLogFile(&defaultConf, "/tmp/codefs_server.log",
                                    maxlogsize);
 
   // Reconfigure default logger to apply settings above

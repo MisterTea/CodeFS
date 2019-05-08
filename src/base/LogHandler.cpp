@@ -3,7 +3,7 @@
 INITIALIZE_EASYLOGGINGPP
 
 namespace codefs {
-el::Configurations LogHandler::SetupLogHandler(int *argc, char ***argv) {
+el::Configurations LogHandler::setupLogHandler(int *argc, char ***argv) {
   // easylogging parse verbose arguments, see [Application Arguments]
   // in https://github.com/muflihun/easyloggingpp/blob/master/README.md
   START_EASYLOGGINGPP(*argc, *argv);
@@ -24,7 +24,7 @@ el::Configurations LogHandler::SetupLogHandler(int *argc, char ***argv) {
   return defaultConf;
 }
 
-void LogHandler::SetupLogFile(el::Configurations *defaultConf, string filename,
+void LogHandler::setupLogFile(el::Configurations *defaultConf, string filename,
                               string maxlogsize) {
   // Enable strict log file size check
   el::Loggers::addFlag(el::LoggingFlag::StrictLogFileSizeCheck);
@@ -39,5 +39,19 @@ void LogHandler::rolloutHandler(const char *filename, std::size_t size) {
   // REMOVE OLD LOG
   ss << "rm " << filename;
   system(ss.str().c_str());
+}
+
+string LogHandler::stderrToFile(const string &pathPrefix) {
+  time_t rawtime;
+  struct tm *timeinfo;
+  char buffer[80];
+  time(&rawtime);
+  timeinfo = localtime(&rawtime);
+  strftime(buffer, sizeof(buffer), "%Y-%m-%d_%I-%M", timeinfo);
+  string current_time(buffer);
+  string stderrFilename = pathPrefix + "_stderr_" + current_time;
+  FILE *stderr_stream = freopen(stderrFilename.c_str(), "w", stderr);
+  setvbuf(stderr_stream, NULL, _IOLBF, BUFSIZ);  // set to line buffering
+  return stderrFilename;
 }
 }  // namespace codefs

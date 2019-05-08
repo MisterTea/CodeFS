@@ -31,9 +31,6 @@
 [submodule "external/sole"]
 	path = external/sole
 	url = https://github.com/r-lyeh-archived/sole.git
-[submodule "external/googletest"]
-	path = external/googletest
-	url = https://github.com/google/googletest.git
 [submodule "external/msgpack-c"]
 	path = external/msgpack-c
 	url = https://github.com/msgpack/msgpack-c.git

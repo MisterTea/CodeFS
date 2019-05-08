@@ -102,7 +102,6 @@ extern "C" {
 using base64 = cppcodec::base64_rfc4648;
 
 #include "CTPL/ctpl_stl.h"
-#include "Catch2/single_include/catch2/catch.hpp"
 #include "msgpack.hpp"
 #include "nlohmann/json.hpp"
 #include "sole/sole.hpp"

@@ -1,7 +1,6 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (CodeFS VERSION 0.0.1)
 
-option(BUILD_TEST "Build all unit test" ON)
 option(CODE_COVERAGE "Enable code coverage" OFF)
 option(BUILD_CLIENT "Build the client (depends on fuse)" ON)
 
@@ -19,9 +18,6 @@ IF(APPLE)
 SET(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fno-pie")
 ENDIF()
 
-IF(BUILD_TEST)
-  add_subdirectory(${CMAKE_SOURCE_DIR}/external/googletest)
-ENDIF(BUILD_TEST)
 IF(CODE_COVERAGE)
   if(UNIX)
     SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fprofile-arcs -ftest-coverage")
@@ -38,6 +34,10 @@ if (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
     set(FREEBSD TRUE)
 endif (CMAKE_SYSTEM_NAME MATCHES "FreeBSD")
 
+# For fsevent
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_CONFIG_H")
+SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -DHAVE_CONFIG_H")
+
 # Add cmake script directory.
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/cmake")
 
@@ -47,7 +47,6 @@ find_package(GFlags REQUIRED)
 find_package(ZeroMQ REQUIRED)
 find_package(Protobuf REQUIRED)
 find_package(Boost REQUIRED COMPONENTS filesystem)
-find_package(fswatch REQUIRED)
 find_package(ZLIB REQUIRED)
 
 IF(BUILD_CLIENT)
@@ -87,13 +86,14 @@ include_directories(
   external/asio/asio/include
   external/json/include
   external/msgpack-c/include
+  external/fswatch_1.9.3
+  external/fswatch_1.9.3/src/
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${GFLAGS_INCLUDE_DIRS}
   ${FUSE_INCLUDE_DIR}
   ${Boost_INCLUDE_DIRS}
   ${ZMQ_INCLUDE_DIRS}
-  ${fswatch_INCLUDE_DIRS}
   ${ZLIB_INCLUDE_DIRS}
   )
 
@@ -102,6 +102,22 @@ add_library(
   STATIC
 
   external/simpleini/ConvertUTF.c
+
+  external/fswatch_1.9.3/src/c/cevent.cpp
+  external/fswatch_1.9.3/src/c/libfswatch_log.cpp
+  external/fswatch_1.9.3/src/c/libfswatch.cpp
+  external/fswatch_1.9.3/src/c++/event.cpp
+  external/fswatch_1.9.3/src/c++/fen_monitor.cpp
+  external/fswatch_1.9.3/src/c++/fsevents_monitor.cpp
+  external/fswatch_1.9.3/src/c++/event.cpp
+  external/fswatch_1.9.3/src/c++/inotify_monitor.cpp
+  external/fswatch_1.9.3/src/c++/kqueue_monitor.cpp
+  external/fswatch_1.9.3/src/c++/libfswatch_exception.cpp
+  external/fswatch_1.9.3/src/c++/monitor.cpp
+  external/fswatch_1.9.3/src/c++/path_utils.cpp
+  external/fswatch_1.9.3/src/c++/poll_monitor.cpp
+  external/fswatch_1.9.3/src/c++/windows_monitor.cpp
+  external/fswatch_1.9.3/src/c++/string/string_utils.cpp
 
   src/base/EasyLoggingWrapper.cpp
 
@@ -184,54 +200,38 @@ target_link_libraries (
   ${GFLAGS_LIBRARIES}
   ${Boost_LIBRARIES}
   ${CORE_LIBRARIES}
-  ${fswatch_LIBRARIES}
   ${ZLIB_LIBRARY_RELEASE}
 )
 
-if(BUILD_TEST) # Build unit tests.
-  message(STATUS "Enabling test for ${PROJECT_NAME}")
-  enable_testing()
+file(GLOB TEST_SRCS test/Test*.cpp )
+add_executable(
+  codefs-test
 
-  set(GTEST_PATH ${PROJECT_SOURCE_DIR}/test)
+  ${TEST_SRCS}
+  )
 
-  file(GLOB TEST_SRCS test/Test*.cpp )
-  add_executable(
-    codefs-test
-  
-    ${TEST_SRCS}
-    )
-  
-  add_dependencies(
-    codefs-test
-    codefs-lib
-    gtest
-    gtest_main
-    gmock
-    gmock_main)
-  
-  target_link_libraries(
-    codefs-test
-    codefs-lib
-    ${ZMQ_LIBRARIES}
-    ${CMAKE_THREAD_LIBS_INIT}
-    gtest
-    gtest_main
-    gmock
-    gmock_main
-    ${GFLAGS_LIBRARIES}
-    ${sodium_LIBRARY_RELEASE}
-    ${Boost_LIBRARIES}
-    ${ZLIB_LIBRARIES}
-    ${ZLIB_LIBRARY_RELEASE}
-    resolv
-    util
-    )
-  add_test(
-    codefs-test
-    codefs-test
-    )
-  
-endif()
+add_dependencies(
+  codefs-test
+
+  codefs-lib)
+
+target_link_libraries(
+  codefs-test
+  codefs-lib
+  ${ZMQ_LIBRARIES}
+  ${CMAKE_THREAD_LIBS_INIT}
+  ${GFLAGS_LIBRARIES}
+  ${sodium_LIBRARY_RELEASE}
+  ${Boost_LIBRARIES}
+  ${ZLIB_LIBRARIES}
+  ${ZLIB_LIBRARY_RELEASE}
+  resolv
+  util
+  )
+add_test(
+  codefs-test
+  codefs-test
+  )
 
 install(TARGETS codefs codefsserver
   PERMISSIONS  OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ
