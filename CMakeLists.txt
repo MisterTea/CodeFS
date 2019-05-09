@@ -7,6 +7,19 @@ option(BUILD_CLIENT "Build the client (depends on fuse)" ON)
 
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DCODEFS_VERSION='\"${PROJECT_VERSION}\"'")
 
+# Link whole archives
+if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" STREQUAL "AppleClang")
+  # using Clang
+  SET(WHOLE_ARCHIVE_ON "-Wl,-force_load,")
+  SET(WHOLE_ARCHIVE_OFF "")
+elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
+  # using GCC
+  SET(WHOLE_ARCHIVE_ON "-Wl,--whole-archive ")
+  SET(WHOLE_ARCHIVE_OFF "-Wl,--whole-archive ")
+else()
+  message( FATAL_ERROR "Unsupported compiler ${CMAKE_CXX_COMPILER_ID}" )
+endif()
+
 # Needed for FUSE
 SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -D_FILE_OFFSET_BITS=64")
 
@@ -61,7 +74,9 @@ SET(FUSE_LIBRARIES ${LIBFUSE_LIBRARIES})
 ENDIF(APPLE)
 ENDIF(BUILD_CLIENT)
 
-IF(FREEBSD)
+IF(APPLE)
+  set(CORE_LIBRARIES "-framework CoreServices" "-framework CoreFoundation" util resolv)
+ELSEIF(FREEBSD)
   set(CORE_LIBRARIES util)
 ELSE()
   set(CORE_LIBRARIES util resolv)
@@ -168,15 +183,15 @@ add_executable (
 target_link_libraries (
   codefs
   LINK_PUBLIC
-  codefs-lib
-  ${ZMQ_LIBRARIES}
+  ${WHOLE_ARCHIVE_ON} codefs-lib
+  ${WHOLE_ARCHIVE_OFF} ${ZMQ_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   ${PROTOBUF_LIBRARIES}
   ${GFLAGS_LIBRARIES}
   ${Boost_LIBRARIES}
-  ${CORE_LIBRARIES}
   ${FUSE_LIBRARIES}
   ${ZLIB_LIBRARY_RELEASE}
+  ${CORE_LIBRARIES}
 )
 ENDIF(BUILD_CLIENT)
 
@@ -193,14 +208,14 @@ add_executable (
 target_link_libraries (
   codefsserver
   LINK_PUBLIC
-  codefs-lib
-  ${ZMQ_LIBRARIES}
+  ${WHOLE_ARCHIVE_ON} codefs-lib
+  ${WHOLE_ARCHIVE_OFF} ${ZMQ_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
   ${PROTOBUF_LIBRARIES}
   ${GFLAGS_LIBRARIES}
   ${Boost_LIBRARIES}
-  ${CORE_LIBRARIES}
   ${ZLIB_LIBRARY_RELEASE}
+  ${CORE_LIBRARIES}
 )
 
 file(GLOB TEST_SRCS test/Test*.cpp )
@@ -217,16 +232,16 @@ add_dependencies(
 
 target_link_libraries(
   codefs-test
-  codefs-lib
-  ${ZMQ_LIBRARIES}
+  ${WHOLE_ARCHIVE_ON} codefs-lib
+  ${WHOLE_ARCHIVE_OFF} ${ZMQ_LIBRARIES}
   ${CMAKE_THREAD_LIBS_INIT}
+  ${PROTOBUF_LIBRARIES}
   ${GFLAGS_LIBRARIES}
   ${sodium_LIBRARY_RELEASE}
   ${Boost_LIBRARIES}
   ${ZLIB_LIBRARIES}
   ${ZLIB_LIBRARY_RELEASE}
-  resolv
-  util
+  ${CORE_LIBRARIES}
   )
 add_test(
   codefs-test
