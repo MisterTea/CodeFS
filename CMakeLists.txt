@@ -14,8 +14,8 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang" OR "${CMAKE_CXX_COMPILER_ID}" ST
   SET(WHOLE_ARCHIVE_OFF "")
 elseif ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   # using GCC
-  SET(WHOLE_ARCHIVE_ON "-Wl,--whole-archive ")
-  SET(WHOLE_ARCHIVE_OFF "-Wl,--whole-archive ")
+  SET(WHOLE_ARCHIVE_ON "-Wl,--whole-archive")
+  SET(WHOLE_ARCHIVE_OFF "-Wl,--no-whole-archive")
 else()
   message( FATAL_ERROR "Unsupported compiler ${CMAKE_CXX_COMPILER_ID}" )
 endif()
