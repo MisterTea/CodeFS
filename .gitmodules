@@ -34,3 +34,6 @@
 [submodule "external/msgpack-c"]
 	path = external/msgpack-c
 	url = https://github.com/msgpack/msgpack-c.git
+[submodule "external/UniversalStacktrace"]
+	path = external/UniversalStacktrace
+	url = https://github.com/MisterTea/UniversalStacktrace.git

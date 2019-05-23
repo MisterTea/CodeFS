@@ -1,7 +1,6 @@
 #ifndef __CODEFS_HEADERS__
 #define __CODEFS_HEADERS__
 
-#define ELPP_FEATURE_ALL (1)
 #define ELPP_THREAD_SAFE (1)
 
 // Enable standalone asio
@@ -87,14 +86,10 @@ extern "C" {
 
 #include "simpleini/SimpleIni.h"
 
+#include "UniversalStacktrace/ust/ust.hpp"
 #include "easyloggingpp/src/easylogging++.h"
 
-#if ELPP_STACKTRACE
-#define LOGFATAL \
-  (LOG(ERROR) << "\n" << el::base::debug::StackTrace(), LOG(FATAL))
-#else
-#define LOGFATAL LOGFATAL
-#endif  // ELPP_STACKTRACE
+#define LOGFATAL (LOG(ERROR) << "\n" << ust::generate(), LOG(FATAL))
 
 #include "zlib.h"
 
