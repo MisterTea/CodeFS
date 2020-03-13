@@ -3,14 +3,10 @@
 #include "LogHandler.hpp"
 #include "ServerFileSystem.hpp"
 
-DEFINE_int32(port, 2298, "Port to listen on");
-DEFINE_string(path, "", "Absolute path containing code for codefs to monitor");
-DEFINE_bool(verbose, false, "Verbose logging");
-DEFINE_bool(logtostdout, false, "Log to stdout in addition to the log file");
-
 namespace {
+boost::filesystem::path ROOT_PATH;
 shared_ptr<codefs::ServerFileSystem> globalFileSystem;
-}
+}  // namespace
 
 namespace codefs {
 
@@ -18,7 +14,7 @@ void runFsWatch() {
   fsw::FSW_EVENT_CALLBACK *cb = [](const std::vector<fsw::event> &events,
                                    void *context) {
     for (const auto &it : events) {
-      if (it.get_path().find(FLAGS_path) != 0) {
+      if (it.get_path().find(ROOT_PATH.string()) != 0) {
         LOG(ERROR) << "FSWatch event on invalid path: " << it.get_path();
         continue;
       }
@@ -59,7 +55,7 @@ void runFsWatch() {
 
   // Create the default platform monitor
   fsw::monitor *active_monitor = fsw::monitor_factory::create_monitor(
-      fsw_monitor_type::system_default_monitor_type, {FLAGS_path}, cb);
+      fsw_monitor_type::system_default_monitor_type, {ROOT_PATH.string()}, cb);
 
   // Configure the monitor
   // active_monitor->set_properties(monitor_properties);
@@ -77,99 +73,132 @@ void runFsWatch() {
 }
 
 int main(int argc, char *argv[]) {
-  GOOGLE_PROTOBUF_VERIFY_VERSION;
-  srand(1);
-
   // Setup easylogging configurations
-  el::Configurations defaultConf =
-      codefs::LogHandler::setupLogHandler(&argc, &argv);
-  defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput,
-                          FLAGS_logtostdout ? "true" : "false");
-  if (FLAGS_verbose) el::Loggers::setVerboseLevel(3);
-  string maxlogsize = "20971520";
-  codefs::LogHandler::setupLogFile(&defaultConf, "/tmp/codefs_server.log",
-                                   maxlogsize);
+  el::Configurations defaultConf = LogHandler::setupLogHandler(&argc, &argv);
 
-  // Reconfigure default logger to apply settings above
-  el::Loggers::reconfigureLogger("default", defaultConf);
+  // Parse command line arguments
+  cxxopts::Options options("et", "Remote shell for the busy and impatient");
 
-  if (!FLAGS_path.length()) {
-    LOGFATAL << "Please specify a --path flag containing the code path";
-  }
+  try {
+    options.allow_unrecognised_options();
 
-  FLAGS_path = boost::filesystem::canonical(boost::filesystem::path(FLAGS_path))
-                   .string();
-  cout << "CANONICAL PATH: " << FLAGS_path << endl;
+    options.add_options()         //
+        ("h,help", "Print help")  //
+        ("port", "Port to listen on",
+         cxxopts::value<int>()->default_value("2298"))  //
+        ("path", "Absolute path containing code for codefs to monitor",
+         cxxopts::value<std::string>()->default_value(""))  //
+        ("v,verbose", "Enable verbose logging",
+         cxxopts::value<int>()->default_value("0"))  //
+        ("logtostdout", "Write log to stdout")       //
+        ;
 
-  // Check for .codefs config
-  auto cfgPath =
-      boost::filesystem::path(FLAGS_path) / boost::filesystem::path(".codefs");
-  set<boost::filesystem::path> excludes;
-  if (boost::filesystem::exists(cfgPath)) {
-    CSimpleIniA ini(true, true, true);
-    SI_Error rc = ini.LoadFile(cfgPath.string().c_str());
-    if (rc == 0) {
-      auto relativeExcludes =
-          split(ini.GetValue("Scanner", "Excludes", NULL), ',');
-      for (auto exclude : relativeExcludes) {
-        excludes.insert(boost::filesystem::path(FLAGS_path) / exclude);
-      }
+    auto result = options.parse(argc, argv);
+    if (result.count("help")) {
+      cout << options.help({}) << endl;
+      exit(0);
+    }
+
+    if (result.count("logtostdout")) {
+      defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "true");
     } else {
-      LOGFATAL << "Invalid ini file: " << cfgPath;
+      defaultConf.setGlobally(el::ConfigurationType::ToStandardOutput, "false");
     }
-  }
 
-  // Check for .watchmanconfig and update excludes
-  auto pathToCheck = boost::filesystem::path(FLAGS_path);
-  while (true) {
-    auto cfgPath = pathToCheck / boost::filesystem::path(".watchmanconfig");
+    if (result.count("verbose")) {
+      el::Loggers::setVerboseLevel(result["verbose"].as<int>());
+    }
+    string maxlogsize = "20971520";
+    codefs::LogHandler::setupLogFile(&defaultConf, "/tmp/codefs_server.log",
+                                     maxlogsize);
+
+    // Reconfigure default logger to apply settings above
+    el::Loggers::reconfigureLogger("default", defaultConf);
+
+    if (!result.count("path")) {
+      LOGFATAL << "Please specify a --path flag containing the code path";
+    }
+
+    ROOT_PATH = boost::filesystem::canonical(
+                    boost::filesystem::path(result["path"].as<string>()))
+                    .string();
+    cout << "CANONICAL PATH: " << ROOT_PATH << endl;
+
+    // Check for .codefs config
+    auto cfgPath = ROOT_PATH / boost::filesystem::path(".codefs");
+    set<boost::filesystem::path> excludes;
     if (boost::filesystem::exists(cfgPath)) {
-      LOG(INFO) << "Found watchman config: " << cfgPath;
-      auto configJson = json::parse(fileToStr(cfgPath.string()));
-      for (auto ignoreDir : configJson["ignore_dirs"]) {
-        auto absoluteIgnoreDir = pathToCheck / ignoreDir.get<std::string>();
-        LOG(INFO) << "Adding exclude: " << absoluteIgnoreDir;
-        excludes.insert(absoluteIgnoreDir);
+      CSimpleIniA ini(true, true, true);
+      SI_Error rc = ini.LoadFile(cfgPath.string().c_str());
+      if (rc == 0) {
+        auto relativeExcludes =
+            split(ini.GetValue("Scanner", "Excludes", NULL), ',');
+        for (auto exclude : relativeExcludes) {
+          excludes.insert(boost::filesystem::path(ROOT_PATH) / exclude);
+        }
+      } else {
+        LOGFATAL << "Invalid ini file: " << cfgPath;
       }
-      break;
     }
-    if (pathToCheck == "/") {
-      break;
+
+    // Check for .watchmanconfig and update excludes
+    auto pathToCheck = boost::filesystem::path(ROOT_PATH);
+    while (true) {
+      auto cfgPath = pathToCheck / boost::filesystem::path(".watchmanconfig");
+      if (boost::filesystem::exists(cfgPath)) {
+        LOG(INFO) << "Found watchman config: " << cfgPath;
+        auto configJson = json::parse(fileToStr(cfgPath.string()));
+        for (auto ignoreDir : configJson["ignore_dirs"]) {
+          auto absoluteIgnoreDir = pathToCheck / ignoreDir.get<std::string>();
+          LOG(INFO) << "Adding exclude: " << absoluteIgnoreDir;
+          excludes.insert(absoluteIgnoreDir);
+        }
+        break;
+      }
+      if (pathToCheck == "/") {
+        break;
+      }
+      pathToCheck = pathToCheck.parent_path();
     }
-    pathToCheck = pathToCheck.parent_path();
-  }
 
-  shared_ptr<ServerFileSystem> fileSystem(
-      new ServerFileSystem(FLAGS_path, excludes));
-  shared_ptr<Server> server(new Server(
-      string("tcp://") + "0.0.0.0" + ":" + to_string(FLAGS_port), fileSystem));
+    shared_ptr<ServerFileSystem> fileSystem(
+        new ServerFileSystem(ROOT_PATH.string(), excludes));
+    shared_ptr<Server> server(
+        new Server(string("tcp://") + "0.0.0.0" + ":" +
+                       to_string(result["port"].as<int>()),
+                   fileSystem));
 
-  globalFileSystem = fileSystem;
-  shared_ptr<thread> watchThread(new thread(runFsWatch));
-  usleep(100 * 1000);
+    globalFileSystem = fileSystem;
+    shared_ptr<thread> watchThread(new thread(runFsWatch));
+    usleep(100 * 1000);
 
-  fileSystem->init();
-  LOG(INFO) << "Server filesystem initialized";
+    fileSystem->init();
+    LOG(INFO) << "Server filesystem initialized";
 
-  fileSystem->setHandler(server.get());
-  server->init();
-  usleep(100 * 1000);
+    fileSystem->setHandler(server.get());
+    server->init();
+    usleep(100 * 1000);
 
-  auto lastHeartbeatTime = std::chrono::high_resolution_clock::now();
-  while (true) {
-    int retval = server->update();
-    if (retval) {
-      return retval;
+    auto lastHeartbeatTime = std::chrono::high_resolution_clock::now();
+    while (true) {
+      int retval = server->update();
+      if (retval) {
+        return retval;
+      }
+      auto msSinceLastHeartbeat =
+          std::chrono::duration_cast<std::chrono::milliseconds>(
+              std::chrono::high_resolution_clock::now() - lastHeartbeatTime)
+              .count();
+      if (msSinceLastHeartbeat >= 3000) {
+        server->heartbeat();
+        lastHeartbeatTime = std::chrono::high_resolution_clock::now();
+      }
+      usleep(1);
     }
-    auto msSinceLastHeartbeat =
-        std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::high_resolution_clock::now() - lastHeartbeatTime)
-            .count();
-    if (msSinceLastHeartbeat >= 3000) {
-      server->heartbeat();
-      lastHeartbeatTime = std::chrono::high_resolution_clock::now();
-    }
-    usleep(1);
+  } catch (cxxopts::OptionException &oe) {
+    cout << "Exception: " << oe.what() << "\n" << endl;
+    cout << options.help({}) << endl;
+    exit(1);
   }
 }
 }  // namespace codefs

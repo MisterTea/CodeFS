@@ -37,3 +37,12 @@
 [submodule "external/UniversalStacktrace"]
 	path = external/UniversalStacktrace
 	url = https://github.com/MisterTea/UniversalStacktrace.git
+[submodule "external/sanitizers-cmake"]
+	path = external/sanitizers-cmake
+	url = git://github.com/arsenm/sanitizers-cmake.git
+[submodule "external/cotire"]
+	path = external/cotire
+	url = https://github.com/sakra/cotire.git
+[submodule "external/fswatch"]
+	path = external/fswatch
+	url = https://github.com/emcrisostomo/fswatch.git

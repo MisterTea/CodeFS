@@ -11,13 +11,22 @@ string FileSystem::serializeFileDataCompressed(const string& path) {
     writer.writePrimitive<int>(0);
   } else {
     const auto& fileData = allFileData.at(path);
-    writer.writePrimitive<int>(1 + fileData.child_node_size());
+    int numChildren = 0;
+    for (auto& it : fileData.child_node()) {
+      auto childPath = (boost::filesystem::path(path) / it).string();
+      if (allFileData.find(childPath) == allFileData.end()) {
+        numChildren++;
+      }
+    }
+    writer.writePrimitive<int>(1 + numChildren);
     writer.writeProto(fileData);
     for (auto& it : fileData.child_node()) {
       auto childPath = (boost::filesystem::path(path) / it).string();
-      VLOG(1) << "SCANNING: " << path << " / " << it << " = " << childPath;
-      const auto& childFileData = allFileData.at(childPath);
-      writer.writeProto(childFileData);
+      if (allFileData.find(childPath) != allFileData.end()) {
+        VLOG(1) << "SCANNING: " << path << " / " << it << " = " << childPath;
+        const auto& childFileData = allFileData.at(childPath);
+        writer.writeProto(childFileData);
+      }
     }
   }
   return compressString(writer.finish());

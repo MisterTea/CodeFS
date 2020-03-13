@@ -23,6 +23,7 @@ class FdInfo {
   FdInfo(const string &_path) : path(_path) {}
 };
 
+recursive_mutex fdMapMutex;
 unordered_map<int64_t, FdInfo> fdMap;
 unordered_map<int64_t, DirectoryPointer *> dirpMap;
 
@@ -266,14 +267,17 @@ static int codefs_getattr(const char *path, struct stat *stbuf) {
 
 static int codefs_fgetattr(const char *path, struct stat *stbuf,
                            struct fuse_file_info *fi) {
-  LOG(INFO) << "GETTING ATTR FOR FD " << fi->fh;
-  auto it = fdMap.find(fi->fh);
-  if (it == fdMap.end()) {
-    LOG(INFO) << "MISSING FD";
-    errno = EBADF;
-    return -errno;
+  {
+    lock_guard<recursive_mutex> guard(fdMapMutex);
+    LOG(INFO) << "GETTING ATTR FOR FD " << fi->fh;
+    auto it = fdMap.find(fi->fh);
+    if (it == fdMap.end()) {
+      LOG(INFO) << "MISSING FD";
+      errno = EBADF;
+      return -errno;
+    }
+    LOG(INFO) << "PATHS: " << string(path) << " " << it->second.path;
   }
-  LOG(INFO) << "PATHS: " << string(path) << " " << it->second.path;
   return codefs_getattr(path, stbuf);
 }
 
@@ -336,6 +340,7 @@ static int codefs_create(const char *path, mode_t mode,
   if (fd == -1) return -errno;
   fi->fh = fd;
   LOG(INFO) << "CREATING FD " << fi->fh << " FOR PATH " << path;
+  lock_guard<recursive_mutex> guard(fdMapMutex);
   fdMap.insert(make_pair((int64_t)fd, FdInfo(string(path))));
   return 0;
 }
@@ -370,6 +375,7 @@ static int codefs_open(const char *path, struct fuse_file_info *fi) {
 
   fi->fh = fd;
   LOG(INFO) << "OPENING FD " << fi->fh << " WITH MODE " << readWriteMode;
+  lock_guard<recursive_mutex> guard(fdMapMutex);
   fdMap.insert(make_pair((int64_t)fd, FdInfo(string(path))));
   return 0;
 }
@@ -406,16 +412,19 @@ static int codefs_statfs(const char *path, struct statvfs *stbuf) {
 
 static int codefs_release(const char *path, struct fuse_file_info *fi) {
   int fd = fi->fh;
-  LOG(INFO) << "RELEASING " << path << " FD " << fd;
-  auto it = fdMap.find((int64_t)(fd));
-  if (it == fdMap.end()) {
-    LOGFATAL << "Tried to close an fd that doesn't exist";
+  {
+    lock_guard<recursive_mutex> guard(fdMapMutex);
+    LOG(INFO) << "RELEASING " << path << " FD " << fd;
+    auto it = fdMap.find((int64_t)(fd));
+    if (it == fdMap.end()) {
+      LOGFATAL << "Tried to close an fd that doesn't exist";
+    }
+    string pathFromFd = it->second.path;
+    if (pathFromFd != string(path)) {
+      LOG(ERROR) << "PATHS DO NOT MATCH! " << pathFromFd << " " << path;
+    }
+    fdMap.erase(it);
   }
-  string pathFromFd = it->second.path;
-  if (pathFromFd != string(path)) {
-    LOG(ERROR) << "PATHS DO NOT MATCH! " << pathFromFd << " " << path;
-  }
-  fdMap.erase(it);
   client->close(path, fd);
   return 0;
 }

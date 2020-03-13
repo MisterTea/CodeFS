@@ -5,8 +5,6 @@
 #define CATCH_CONFIG_RUNNER
 #include "Catch2/single_include/catch2/catch.hpp"
 
-DEFINE_int32(v, 0, "verbose level");
-
 namespace codefs {
 int main(int argc, char** argv) {
   srand(1);

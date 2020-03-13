@@ -1,6 +1,21 @@
 cmake_minimum_required (VERSION 3.0.2)
 project (CodeFS VERSION 0.0.1)
 
+SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/external/sanitizers-cmake/cmake" ${CMAKE_MODULE_PATH})
+FIND_PACKAGE(Sanitizers)
+
+MACRO(DECORATE_TARGET TARGET_NAME)
+  add_sanitizers(${TARGET_NAME})
+  set_target_properties(${TARGET_NAME} PROPERTIES COTIRE_CXX_PREFIX_HEADER_INIT "src/base/Headers.hpp")
+  cotire(${TARGET_NAME})
+ENDMACRO()
+
+SET(CMAKE_MODULE_PATH "${CMAKE_SOURCE_DIR}/external/cotire/CMake" ${CMAKE_MODULE_PATH})
+INCLUDE(cotire)
+if(POLICY CMP0058) 
+    cmake_policy(SET CMP0058 NEW) # Needed for cotire
+endif() 
+
 option(CODE_COVERAGE "Enable code coverage" OFF)
 option(BUILD_CLIENT "Build the client (depends on fuse)" ON)
 
@@ -37,9 +52,12 @@ IF(CODE_COVERAGE)
   endif()
 ENDIF(CODE_COVERAGE)
 
-# Enable C++-11
 if(UNIX)
-	SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
+  # Enable C++-11
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -std=c++11")
+
+  # Enable debug info
+  SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 endif()
 
 #Using FreeBSD?
@@ -101,8 +119,10 @@ include_directories(
   external/asio/asio/include
   external/json/include
   external/msgpack-c/include
-  external/fswatch_1.9.3
-  external/fswatch_1.9.3/src/
+  external/fswatch_config
+  external/fswatch/libfswatch/src
+  external/fswatch/libfswatch/src/libfswatch
+  external/cxxopts/include
   ${CMAKE_CURRENT_BINARY_DIR}
   ${CMAKE_CURRENT_SOURCE_DIR}
   ${GFLAGS_INCLUDE_DIRS}
@@ -112,27 +132,44 @@ include_directories(
   ${ZLIB_INCLUDE_DIRS}
   )
 
+if(APPLE)
+SET(
+    OS_FSWATCH_FILES
+
+    external/fswatch/libfswatch/src/libfswatch/c++/fsevents_monitor.cpp
+)
+elseif(UNIX)
+SET(
+    OS_FSWATCH_FILES
+
+    external/fswatch/libfswatch/src/libfswatch/c++/inotify_monitor.cpp
+)
+else()
+SET(
+    OS_FSWATCH_FILES
+
+    external/fswatch/libfswatch/src/libfswatch/c++/windows_monitor.cpp
+)
+endif()
 add_library(
   codefs-lib
   STATIC
 
   external/simpleini/ConvertUTF.c
 
-  external/fswatch_1.9.3/src/c/cevent.cpp
-  external/fswatch_1.9.3/src/c/libfswatch_log.cpp
-  external/fswatch_1.9.3/src/c/libfswatch.cpp
-  external/fswatch_1.9.3/src/c++/event.cpp
-  external/fswatch_1.9.3/src/c++/fen_monitor.cpp
-  external/fswatch_1.9.3/src/c++/fsevents_monitor.cpp
-  external/fswatch_1.9.3/src/c++/event.cpp
-  external/fswatch_1.9.3/src/c++/inotify_monitor.cpp
-  external/fswatch_1.9.3/src/c++/kqueue_monitor.cpp
-  external/fswatch_1.9.3/src/c++/libfswatch_exception.cpp
-  external/fswatch_1.9.3/src/c++/monitor.cpp
-  external/fswatch_1.9.3/src/c++/path_utils.cpp
-  external/fswatch_1.9.3/src/c++/poll_monitor.cpp
-  external/fswatch_1.9.3/src/c++/windows_monitor.cpp
-  external/fswatch_1.9.3/src/c++/string/string_utils.cpp
+  external/fswatch/libfswatch/src/libfswatch/c/cevent.cpp
+  external/fswatch/libfswatch/src/libfswatch/c/libfswatch_log.cpp
+  external/fswatch/libfswatch/src/libfswatch/c/libfswatch.cpp
+  external/fswatch/libfswatch/src/libfswatch/c++/event.cpp
+  external/fswatch/libfswatch/src/libfswatch/c++/fen_monitor.cpp
+  external/fswatch/libfswatch/src/libfswatch/c++/event.cpp
+  external/fswatch/libfswatch/src/libfswatch/c++/libfswatch_exception.cpp
+  external/fswatch/libfswatch/src/libfswatch/c++/monitor.cpp
+  external/fswatch/libfswatch/src/libfswatch/c++/monitor_factory.cpp
+  external/fswatch/libfswatch/src/libfswatch/c++/path_utils.cpp
+  external/fswatch/libfswatch/src/libfswatch/c++/poll_monitor.cpp
+  external/fswatch/libfswatch/src/libfswatch/c++/string/string_utils.cpp
+  ${OS_FSWATCH_FILES}
 
   src/base/EasyLoggingWrapper.cpp
 
@@ -166,6 +203,7 @@ add_dependencies(
   codefs-lib
   generated-code
 )
+DECORATE_TARGET(codefs-lib)
 
 IF(BUILD_CLIENT)
 add_executable (
@@ -193,6 +231,7 @@ target_link_libraries (
   ${ZLIB_LIBRARY_RELEASE}
   ${CORE_LIBRARIES}
 )
+DECORATE_TARGET(codefs)
 ENDIF(BUILD_CLIENT)
 
 add_executable (
@@ -217,6 +256,7 @@ target_link_libraries (
   ${ZLIB_LIBRARY_RELEASE}
   ${CORE_LIBRARIES}
 )
+DECORATE_TARGET(codefsserver)
 
 file(GLOB TEST_SRCS test/Test*.cpp )
 add_executable(
@@ -224,7 +264,6 @@ add_executable(
 
   ${TEST_SRCS}
   )
-
 add_dependencies(
   codefs-test
 
@@ -247,6 +286,7 @@ add_test(
   codefs-test
   codefs-test
   )
+DECORATE_TARGET(codefs-test)
 
 install(TARGETS codefs codefsserver
   PERMISSIONS  OWNER_EXECUTE OWNER_WRITE OWNER_READ GROUP_EXECUTE GROUP_READ WORLD_EXECUTE WORLD_READ

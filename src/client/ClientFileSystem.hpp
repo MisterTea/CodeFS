@@ -241,6 +241,7 @@ class ClientFileSystem : public FileSystem {
   }
 
   void renameOwnedFileIfItExists(const string& from, const string& to) {
+    std::lock_guard<std::recursive_mutex> lock(mutex);
     if (ownedFileContents.find(to) != ownedFileContents.end()) {
       LOGFATAL << "I don't handle renaming from one open file to another yet";
     }
